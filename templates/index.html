@@ -1,0 +1,370 @@
+<html>
+    <head>
+        <link href="/static/datatables.min.css" rel="stylesheet">
+        <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+        <link rel="stylesheet" href="/static/style.css" />
+        <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>-->
+        <!--<script src="https://code.jquery.com/jquery-3.7.0.js"></script>-->
+        <script src="/static/jquery-3.7.0.js"></script>
+        <script src="/static/datatables.min.js"></script>
+  
+    
+
+	<script type="text/javascript">
+            //alert(eval(window.location.origin + '/api/v1.0/upload'))
+            function sleep(time) {
+                return new Promise((resolve) => setTimeout(resolve, time));
+            }
+            function _print(value) {
+                document.getElementById('results_text').value += '\n' + value;
+            }
+            function new_task() {
+                $.get('/api/v1.0/calculate', function(req) {
+                    document.getElementById('task_id').value = req.task_id;
+                    document.getElementById('task_dv').innerHTML = 'task_id = ' + req.task_id;
+                });
+            }
+            function request_results(task_id) {
+                function _req() {
+                    $.get('/api/v1.0/results/' + task_id, function(req) {
+                        if (req.exception == '') {
+                            if (req.results == '') {
+                                setTimeout(_req, 1000);
+                            } else {
+                                _print(req.results);
+                            }
+                        }  else {
+                            _print(req.exception);
+                        }
+                    });
+                }
+                _req();
+            }
+            function check_progress() {
+                task_id = document.getElementById('task_id').value;
+                progress_bar = document.getElementById('progress');
+                calc_button = document.getElementById('calc_button');
+                config_button = document.getElementById('config_button');
+                progress_bar.value = 0;
+                function _req() {
+                    $.get('/api/v1.0/progress/' + task_id, function(req) {
+                        if (req.exception == '') {
+                            if (!req.finished) {
+                                progress_bar.value += 10; //req.progress;
+                                if (progress_bar.value >= 100) {
+                                    progress_bar.value = 0;
+                                }
+                                setTimeout(_req, 1500);
+                            } else {
+                                calc_button.disabled = false;
+                                config_button.disabled = false;
+                                progress_bar.value = 100;
+                                request_results(task_id);
+                            }
+                        } else {
+                            calc_button.disabled = false;
+                            config_button.disabled = false;
+                            progress_bar.value = 0;
+                            _print(req.exception);
+                        }
+                    });
+                }
+                _req();
+            }
+            function calculate() {
+                document.getElementById('calc_button').disabled = true;
+                document.getElementById('config_button').disabled = true;
+                new_task();
+                sleep(300).then(() => {
+                    check_progress();
+                });
+            }
+            function request_table(table_name) {
+                function add_link(idx){
+                                        item = $(this).find('td').first();
+                                        item.html(item.text() + '&nbsp;&nbsp;<a href="javascript: new_imagetab(\''+item.text()+'\', \'production\');">P</a>&nbsp;&nbsp;<a href="javascript: new_imagetab(\''+item.text()+'\', \'consumption\');">C</a>');
+                                        //item.tex = '<a>' + item.innerHTML + '</a>';
+                                        //$(this).append('<div style="display:inline-block;float:left;position:absolute;"><a href="link'+i+'" >Button '+item.text()+'</a></div>');
+                            }
+                $.get('/api/v1.0/table/' + table_name, function(req) {
+                    if (req.exception == '') {
+                        if ($.fn.dataTable.isDataTable('#'+table_name)) {
+                            table = $('#'+table_name).DataTable({data: req.data, retrieve: true, searching: false,
+                            "fnDrawCallback": function(oSettings) {
+                                if (table_name == 'building_data') {
+                                    $('#'+table_name+' tbody').find('tr').each(add_link);
+                                }
+                            }
+                        });
+                        } else {
+                            table = new DataTable('#'+table_name, {columns: req.cols, data: req.data, searching: false,
+                            "fnDrawCallback": function(oSettings) {
+                                if (table_name == 'building_data') {
+                                    $('#'+table_name+' tbody').find('tr').each(add_link);
+                                }
+                            }
+                        });
+                        }
+                    }
+                });
+            }
+            
+            function config_update(update=false) {
+                if (update == true) {
+                    value = '?city_selling_price='+document.getElementById('city_selling_price').value;
+                    value += '&grid_selling_price='+document.getElementById('grid_selling_price').value;
+                    value += '&grid_buying_price='+document.getElementById('grid_buying_price').value;
+                    value += '&autonomy_period_days='+document.getElementById('autonomy_period_days').value;
+                    value += '&installation_coef='+document.getElementById('installation_coef').value;
+                    value += '&miscellaneous_coef='+document.getElementById('miscellaneous_coef').value;
+                    value += '&discount_rate='+document.getElementById('discount_rate').value;
+                    value += '&discount_horison='+document.getElementById('discount_horison').value;
+
+                    value += '&max_investments='+document.getElementById('max_investments').value;
+                    value += '&max_payback_perod='+document.getElementById('max_payback_perod').value;
+                    value += '&min_payback_perod='+document.getElementById('min_payback_perod').value;
+                    value += '&max_equipment_count='+document.getElementById('max_equipment_count').value;
+                    value += '&min_equipment_count='+document.getElementById('min_equipment_count').value;
+                    value += '&shown_solutions_limit='+document.getElementById('shown_solutions_limit').value;
+                    value += '&battery_capacity_uplimit='+document.getElementById('battery_capacity_uplimit').value;
+                    value += '&ray_rate='+document.getElementById('ray_rate').value;
+                    value += '&num_cpus='+document.getElementById('num_cpus').value;
+
+                    $.get('/api/v1.0/update'+value, function(req) {
+                        if (req.exception == '') {
+                        }
+                    });  
+                } else {
+                    $.get('/api/v1.0/update', function(req) {
+                        if (req.exception == '') {
+                            document.getElementById('city_selling_price').value = req.city_selling_price;
+                            document.getElementById('grid_selling_price').value = req.grid_selling_price;
+                            document.getElementById('grid_buying_price').value = req.grid_buying_price;
+                            document.getElementById('autonomy_period_days').value = req.autonomy_period_days;
+                            document.getElementById('installation_coef').value = req.installation_coef;
+                            document.getElementById('miscellaneous_coef').value = req.miscellaneous_coef;
+                            document.getElementById('discount_rate').value = req.discount_rate;
+                            document.getElementById('discount_horison').value = req.discount_horison;
+                            document.getElementById('max_investments').value = req.max_investments;
+                            document.getElementById('max_payback_perod').value = req.max_payback_perod;
+                            document.getElementById('min_payback_perod').value = req.min_payback_perod;
+                            document.getElementById('max_equipment_count').value = req.max_equipment_count;
+                            document.getElementById('min_equipment_count').value = req.min_equipment_count;
+                            document.getElementById('shown_solutions_limit').value = req.shown_solutions_limit;
+                            document.getElementById('battery_capacity_uplimit').value = req.battery_capacity_uplimit;
+                            document.getElementById('ray_rate').value = req.ray_rate;
+                            document.getElementById('num_cpus').value = req.num_cpus;
+                        }
+                    });
+                }
+            }
+            function hide(id){
+                    e = document.getElementById(id)
+                    if (e != null) {e.style = "display: none;"}
+                    //if (e != null) {e.style = "visibility: hidden;"}
+                }
+            function show(id){
+                    e = document.getElementById(id)
+                    if (e != null) {e.style = "display: block;"}
+                    //if (e != null) {e.style = "visibility: visible;"}
+                }
+            function tab_click(tab_id) {
+                document.getElementById('a_solutions').classList.remove('here');
+                document.getElementById('a_infrastructure').classList.remove('here');
+                document.getElementById('a_equipment').classList.remove('here');
+                document.getElementById('a_uploading').classList.remove('here');
+                hide('tab_solutions');
+                hide('tab_infrastructure');
+                hide('tab_equipment');
+                hide('tab_uploading');
+                if (tab_id == 'tab_solutions') {
+                    document.getElementById('a_solutions').classList.add('here');
+                    show('tab_solutions');
+                    subtab_click('calculation');
+                }
+                if (tab_id == 'tab_infrastructure') {
+                    document.getElementById('a_infrastructure').classList.add('here');
+                    show('tab_infrastructure');
+                    subtab_click('building_data');
+                }
+                if (tab_id == 'tab_equipment') {
+                    document.getElementById('a_equipment').classList.add('here');
+                    show('tab_equipment');
+                    subtab_click('equipment_data');
+                }
+                if (tab_id == 'tab_uploading') {
+                    document.getElementById('a_uploading').classList.add('here');
+                    show('tab_uploading');
+                    subtab_click('uploading');
+                }
+            }
+            function subtab_click(tab_id) {
+                if (!document.getElementById('a_'+tab_id).classList.contains('here')) {
+                    if (tab_id != 'uploading' & tab_id != 'calculation'){
+                    request_table(tab_id);
+                    config_update();
+                    }
+                }
+                document.getElementById('a_calculation').classList.remove('here');
+                document.getElementById('a_solution_data').classList.remove('here');
+                document.getElementById('a_building_data').classList.remove('here');
+                document.getElementById('a_location_data').classList.remove('here');
+                document.getElementById('a_equipment_data').classList.remove('here');
+                document.getElementById('a_battery_data').classList.remove('here');
+                document.getElementById('a_'+tab_id).classList.add('here');
+                hide('calculation_div');
+                hide('solution_data_div');
+                hide('building_data_div');
+                hide('location_data_div');
+                hide('equipment_data_div');
+                hide('battery_data_div');
+                hide('uploading_div');
+                show(tab_id+'_div');
+            }
+            function new_imagetab(building_uuid, data_type) {
+                $.get('/api/v1.0/figure/'+building_uuid+'/'+data_type, function(req) {
+                        if (req.exception == '') {
+                            var img = new Image();
+                            img.src = 'data:image/png;base64,' + req.image_url;
+                            //alert(img.src)
+                            var w = window.open("",'_blank');
+                            w.document.write('<title>'+data_type+', uuid: '+building_uuid+'</title>'+img.outerHTML);
+                            //w.document.close();
+                        } else {
+                            _print(req.exception)
+                        }
+                    });
+            }
+            function do_it_once() {
+                config_update();
+                
+            }
+
+ 
+
+	</script>
+    </head>
+    <body onload="javascript: do_it_once()">
+
+        <ul id="globalnav">
+            <li><a href="javascript: tab_click('tab_solutions');" id="a_solutions" class="here">Solutions</a></li>
+            <ul id="tab_solutions">
+                <li><a href="javascript: subtab_click('calculation');" id="a_calculation" class="here">Calculate</a></li>
+                <li><a href="javascript: subtab_click('solution_data');" id="a_solution_data">Saved solutions</a></li>
+            </ul>
+            <li><a href="javascript: tab_click('tab_infrastructure');" id="a_infrastructure">Infrastructure</a></li>
+            <ul id="tab_infrastructure" style="display: none;" >
+                <li><a href="javascript: subtab_click('building_data');" id="a_building_data">Buildings</a></li>
+                <li><a href="javascript: subtab_click('location_data');" id="a_location_data">Locations</a></li>
+            </ul>
+            <li><a href="javascript: tab_click('tab_equipment');" id="a_equipment">Equipment</a></li>
+            <ul id="tab_equipment" style="display: none;">
+                <li><a href="javascript: subtab_click('equipment_data');" id="a_equipment_data">Photovoltaic</a></li>
+                <li><a href="javascript: subtab_click('battery_data');" id="a_battery_data">Batteries</a></li>
+            </ul>
+            <li><a href="javascript: tab_click('tab_uploading');" id="a_uploading">Upload</a></li>
+            <ul id="tab_uploading" style="display: none;">
+                <li><a href="#">&nbsp;</a></li>
+            </ul>
+        </ul>
+
+        <div id="solution_data_div"><table id="solution_data" class="display" width="100%"></table></div>
+        <div id="building_data_div"><table id="building_data" class="display" width="100%"></table></div>
+        <div id="location_data_div"><table id="location_data" class="display" width="100%"></table></div>
+        <div id="equipment_data_div"><table id="equipment_data" class="display" width="100%"></table></div>
+        <div id="battery_data_div"><table id="battery_data" class="display" width="100%"></table></div>
+
+        <div id="calculation_div">
+            <table>
+                    <tr>
+                        <td>
+                            <textarea id="results_text" rows="15" cols="65">{{ log }}{{ files_uploaded }}Results will be here...</textarea>
+                            <input type="hidden" value="{{ task_id }}" id="task_id"/><br />
+                            <progress id="progress" max="100" value="0" style="width: 100%"></progress><br />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><div id="task_dv">task_id = {{ task_id }}</div>
+                            <button type="button" onclick="javascript:calculate();" id="calc_button" style="width: 100%">calculate</button>
+                            <div id="config">
+                                <table>
+                                        <tr>
+                                            <td><div><button type="button" onclick="javascript:config_update(true);" id="config_button" style="width: 100%">update config</button></div></td> 
+                                        <tr>
+                                            <td><div>city_selling_price:</td><td><input type="text" name="city_selling_price" id="city_selling_price"/><br /></div></td>
+                                        <tr>
+                                            <td><div>grid_selling_price:</td><td><input type="text" name="grid_selling_price" id="grid_selling_price"/><br /></div></td>
+                                        <tr>
+                                            <td><div>grid_buying_price:</td><td><input type="text" name="grid_buying_price" id="grid_buying_price"/><br /></div></td> 
+                                        <tr>
+                                            <td><div>autonomy_period_days:</td><td><input type="text" name="autonomy_period_days" id="autonomy_period_days"/><br /></div></td>
+                                        <tr>
+                                            <td><div>installation_coef:</td><td><input type="text" name="installation_coef" id="installation_coef"/><br /></div></td>
+                                        <tr>
+                                            <td><div>miscellaneous_coef:</td><td><input type="text" name="miscellaneous_coef" id="miscellaneous_coef"/><br /></div></td>
+                                        <tr>
+                                            <td><div>discount_rate:</td><td><input type="text" name="discount_rate" id="discount_rate"/><br /></div></td>
+                                        <tr>
+                                            <td><div>discount_horison:</td><td><input type="text" name="discount_horison" id="discount_horison"/><br /></div></td>                
+            
+                                        <tr>
+                                            <td><div>max_investments:</td><td><input type="text" name="max_investments" id="max_investments"/><br /></div></td>
+                                        <tr>
+                                            <td><div>max_payback_perod:</td><td><input type="text" name="max_payback_perod" id="max_payback_perod"/><br /></div></td>
+                                        <tr>
+                                            <td><div>min_payback_perod:</td><td><input type="text" name="min_payback_perod" id="min_payback_perod"/><br /></div></td>            
+                                        <tr>
+                                            <td><div>max_equipment_count:</td><td><input type="text" name="max_equipment_count" id="max_equipment_count"/><br /></div></td>
+                                        <tr>
+                                            <td><div>min_equipment_count:</td><td><input type="text" name="min_equipment_count" id="min_equipment_count"/><br /></div></td>
+                                        <tr>
+                                            <td><div>shown_solutions_limit:</td><td><input type="text" name="shown_solutions_limit" id="shown_solutions_limit"/><br /></div></td>
+                                        <tr>
+                                            <td><div>battery_capacity_uplimit:</td><td><input type="text" name="battery_capacity_uplimit" id="battery_capacity_uplimit"/><br /></div></td>
+                                        <tr>
+                                            <td><div>ray_rate:</td><td><input type="text" name="ray_rate" id="ray_rate"/><br /></div></td>
+                                        <tr>
+                                            <td><div>num_cpus:</td><td><input type="text" name="num_cpus" id="num_cpus"/><br /></div></td>
+                                    </table>
+                            </div>
+                            
+                        </td>
+                    </tr>
+            </table>
+        </div>
+            
+        <div id="uploading_div" style="display: none;">
+            <table>
+                <form action="/api/v1.0/upload" method="POST" enctype="multipart/form-data">
+                    <tr>
+                        <td><div>Components (xlsx file):</td><td><input type="file" name="excel_file" /><br /></div></td>
+                    <tr>
+                        <td><div>Consumption profile (json file):</td><td><input type="file" name="consumption_file" /><br /></div></td>
+                    <tr>
+                        <td><div>Production profile (json file):</td><td><input type="file" name="production_file" /><br /></div></td>
+                    <!--
+                    <tr>
+                        <td><div>consumption_file: </td><td><input type="file" name="consumption_file" /><br /></div></td>
+                    <tr>
+                        <td><div>production_file:  </td><td><input type="file" name="production_file" /><br /></div></td>
+                    <tr>
+                        <td><div>building_file:    </td><td><input type="file" name="building_file" /><br /></div></td>
+                    <tr>
+                        <td><div>location_file:    </td><td><input type="file" name="location_file" /><br /></div></td>
+                    <tr>
+                        <td><div>equipment_file:   </td><td><input type="file" name="equipment_file" /><br /></div></td>
+                    <tr>
+                        <td><div>battery_file:     </td><td><input type="file" name="battery_file" /><br /></div></td>
+                    -->                    
+                    <tr>
+                        <td></td>
+                        <td><div>&nbsp;</div>
+                            <button type="submit" style="width: 100%">upload</button></td>
+                </form> 
+            </table>
+
+        </div>
+
+    </body>
+</html>
+

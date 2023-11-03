@@ -1,0 +1,17 @@
+faas_cache_dict==0.2.7
+filelock==3.6.0
+Flask==3.0.0
+flaskwebgui==1.0.8
+humanfriendly==10.0
+jsonpickle==3.0.2
+matplotlib==3.8.0
+numpy==1.26.1
+opencv_python==4.8.1.78
+pandas==2.1.2
+pvutils==1.0
+python-constraint==1.4.0
+ray==2.7.1
+Requests==2.31.0
+tqdm==4.66.1
+Werkzeug==3.0.1
+pvutils @ git+https://github.com/ellariel/pvutils.git

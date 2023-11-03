@@ -1,0 +1,3 @@
+uuid;type;battery_capacity_Ah;battery_energy_Wh;battery_voltage;battery_discharge_factor;battery_price_per_Wh;battery_count
+1;LiFePO4;100;4800;48;0.7;9.738;1
+2;LiFePO4;60;2880;48;0.6;3.738;1
