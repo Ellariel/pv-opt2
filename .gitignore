@@ -40,6 +40,8 @@ instance
 cache.pickle
 *.zip
 *.faas
+*.old
+*.bak
 
 # Installer logs
 pip-log.txt
