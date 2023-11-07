@@ -9,7 +9,6 @@ from collections import OrderedDict
 import numbers
 import copy
 from uuid import uuid4
-import ray
 import gc
 
 import equip
@@ -17,8 +16,8 @@ import equip
 from utils import save_pickle, load_pickle, move_files, make_figure, from_storage, to_storage, is_empty
 from solver import ConstraintSolver#, total_building_energy_costs, total_installation_costs, genossenschaft_profit, _update_building
 
-from pvutils import PVGIS
-#from pvgis import PVGIS
+#from pvutils import PVGIS
+from pvgis import PVGIS
 
 
 base_dir = './'
@@ -34,10 +33,11 @@ config = {
             'max_investments': 250000,
             'max_payback_perod': 30,
             'min_payback_perod': 5,
-            'max_equipment_count': 10,
+            'max_equipment_count': 150,
             'min_equipment_count': 10, 
             'shown_solutions_limit': 5,
             'battery_capacity_uplimit': 2.0,
+            'use_ray': 0,
             'ray_rate': 1.0,
             'num_cpus': 4,    
         }
@@ -216,154 +216,88 @@ def dict_to_building(building_dict):
 '''
 def calculate(base_dir):   
     global components, buildings, data_tables, config
-
-    #components['location'] = OrderedDict((k, {**v, 'area_sqm' : v['size_sqm'], 'area_used_sqm':0}) for i, (k, v) in enumerate(components['location'].items()))
-    #components['equipment'] = OrderedDict((k, {**v, 'pv_system_loss' : v['pv_loss'], 'pv_count': 1}) for i, (k, v) in enumerate(components['equipment'].items()))
     
-    '''
-    loc = OrderedDict((k, {**v, 'area_sqm' : v['size_sqm'], 'area_used_sqm':0}) for i, (k, v) in enumerate(components['location'].items()) if i < 3)
-    eq = OrderedDict((k, {**v, 'pv_system_loss' : v['pv_loss'], 'pv_count': 100}) for i, (k, v) in enumerate(components['equipment'].items()) if i < 2)
-    bt = OrderedDict()
-    print(loc)
-    print()
-    print(eq)
-    print()
-    solution = equip.Solution.copy()
-    solution['building'] = equip.Building.copy()
-    solution['building']['consumption_profile_key'] = 'G1'
-    equip.load_consumption_profile(solution['building'], consumption_dir)
-    solution['components']['locations'] = loc
-    solution['components']['equipment'] = eq
-    solution['components']['batteries'] = bt
-    print(solution)
-    
-    equip.calc_equipment_allocation(solution, pvgis, calc_production=True)
-    
-    print(solution)
-    print(equip.get_soultion_metrics(solution))
-    '''
-    ray.init(ignore_reinit_error=True)#, num_cpus=4) # log_to_driver=False
-    
-    #pvgis_id = ray.put(pvgis)
-    
-    @ray.remote
-    def solve(building, components, config):
-        solutions = []
-        #try:
-        print(f"solving building: {building['uuid']}")
-        pvgis = PVGIS(verbose=True)
-        start_time = time.time()
-        solver = ConstraintSolver(building, components, pvgis, config=config)
-        solutions = solver.get_solutions()   
-        print(f"{building['uuid']} solving time: {format_timespan(time.time() - start_time)}")
-        #except Exception as e:
-        #print(f"error calculating building {building['uuid']}: {str(e)}")
-        return solutions 
-    
+    results = {}
     _print(f"config: {config}")
-    
-    if config['autonomy_period_days'] == 0:
-        split_key = 'equipment'
-    else:
-        if len(components['equipment']) >= len(components['battery']):
-            split_key = 'equipment'
-        else:
-            split_key = 'battery'        
-    
-    split_list = list(components[split_key].keys())
-    split_count = len(split_list)
-    chunk_size = int(config['ray_rate'] * split_count)
-    if chunk_size < 1:
-        chunk_size = 1
-        
-    print(f"splitting by: {split_key}, chunk size: {chunk_size}")
     start_time = time.time()
     
-    ray_instances = {}
-    for chunk in range(0, split_count, chunk_size):
-        print(split_list[chunk:chunk + chunk_size])
-        _components = components.copy()#copy.deepcopy(components)
-        _components[split_key] = {k : v for k, v in components[split_key].items() if k in split_list[chunk:chunk + chunk_size]}
+    if not config['use_ray']:
+        pvgis = PVGIS(verbose=True)
         for uuid, b in buildings.items():
-            if uuid not in ray_instances:
-                ray_instances[uuid] = []
-            ray_instances[uuid] += [solve.remote(b, _components, config)] #.copy() copy.deepcopy(b)
-    
-    ray_results = {}
-    for uuid, b in buildings.items():
-        ray_results[uuid] = []
-        for s in ray.get(ray_instances[uuid]):
-            ray_results[uuid] += s
-        print(f"possible solutions for building {uuid}: {len(ray_results[uuid])}")
-        #if len(solutions) > 1:
-            #solutions = itemgetter(*np.argsort(costs))(solutions) 
-            #costs = itemgetter(*np.argsort(costs))(costs)
-            ###solutions = solutions[:config['shown_solutions_limit']]
-            #costs = costs[:config['top_limit']]
-            #print(solutions)
-        #    pass
-        
+            results[uuid] = []
+            print(f"solving building: {uuid}")
+            try:
+                _start_time = time.time()
+                solver = ConstraintSolver(b, components, pvgis, config=config)
+                results[uuid] = solver.get_solutions()   
+                print(f"{uuid} solving time: {format_timespan(time.time() - _start_time)}")
+                print(f"possible solutions for building {uuid}: {len(results[uuid])}")
+            except Exception as e:
+                print(f"some error occur while calculating building {uuid}: {str(e)}")
+    else:
+        import ray
+        ray.init(ignore_reinit_error=True)#, num_cpus=4) # log_to_driver=False
 
-    _print(f'total solving time: {format_timespan(time.time() - start_time)}')
-    ray.shutdown()
-    #print(ray_results)
+        @ray.remote
+        def solve(building, components, config):
+            solutions = []
+            try:
+                print(f"solving building: {building['uuid']}")
+                pvgis = PVGIS(verbose=True)
+                _start_time = time.time()
+                solver = ConstraintSolver(building, components, pvgis, config=config)
+                solutions = solver.get_solutions()   
+                print(f"{building['uuid']} solving time: {format_timespan(time.time() - _start_time)}")
+            except Exception as e:
+                print(f"some error occur while calculating building {building['uuid']}: {str(e)}")
+            return solutions 
+
+        if config['autonomy_period_days'] == 0:
+            split_key = 'equipment'
+        else:
+            if len(components['equipment']) >= len(components['battery']):
+                split_key = 'equipment'
+            else:
+                split_key = 'battery'        
+        split_list = list(components[split_key].keys())
+        split_count = len(split_list)
+        chunk_size = int(config['ray_rate'] * split_count)
+        if chunk_size < 1:
+            chunk_size = 1
+        print(f"splitting by: {split_key}, chunk size: {chunk_size}")
+        
+        ray_instances = {}
+        for chunk in range(0, split_count, chunk_size):
+            print(split_list[chunk:chunk + chunk_size])
+            _components = components.copy()#copy.deepcopy(components)
+            _components[split_key] = {k : v for k, v in components[split_key].items() if k in split_list[chunk:chunk + chunk_size]}
+            for uuid, b in buildings.items():
+                if uuid not in ray_instances:
+                    ray_instances[uuid] = []
+                ray_instances[uuid] += [solve.remote(b, _components, config)] #.copy() copy.deepcopy(b)
+        for uuid, b in buildings.items():
+            results[uuid] = []
+            for s in ray.get(ray_instances[uuid]):
+                results[uuid] += s
+            print(f"possible solutions for building {uuid}: {len(results[uuid])}")
+        ray.shutdown()
     
+    _print(f'total solving time: {format_timespan(time.time() - start_time)}')
     for uuid, b in buildings.items():
-        if uuid in ray_results:
-            if len(ray_results[uuid]):
+        if uuid in results:
+            if len(results[uuid]):
                  _print(f"top solutions for building {uuid}:")
                  
                  #ray_results[uuid] = sorted(ray_results[uuid], reverse=True, key=lambda x: x['genossenschaft_value'])
-                 ray_results[uuid] = sorted(ray_results[uuid], reverse=False, key=lambda x: x['solution_energy_costs'])
+                 results[uuid] = sorted(results[uuid], reverse=False, key=lambda x: x['solution_energy_costs'])
                  
-                 solutions = ray_results[uuid][:config['shown_solutions_limit']]
+                 solutions = results[uuid][:config['shown_solutions_limit']]
                  for s in solutions:
                      s.update({'metrics' : equip.get_soultion_metrics(s), 'config' : config})
                      _print(f"{s['metrics']}")
                  data_tables['solution_data'] = save_solutions(data_tables['solution_data'], solutions, storage=solution_dir)
-    
     save_pickle(data_tables, os.path.join(base_dir, 'components.pickle'))
-                 
-            #for solution in ray_results[uuid]:#[:3]:
-                #metrics = equip.get_soultion_metrics(solution)
-                #metrics.update({'allocated' : solution['allocated']})
-                #solution.update(metrics)
-                
-                #if not solution['allocated']:
-                #solutions = solutions[:config['shown_solutions_limit']]
-                
-                ##del solution['building']['production']
-                #del solution['building']['consumption']
-                #_print(f"{metrics}")
-        #break
-    '''
-    for _, b in data_tables['building_data'].iterrows(): #.iloc[:2]
-        if b['uuid'] in ray_results:
-            building = dict_to_building(b.to_dict())
-            s = ray_results[b['uuid']][0][0]
-            _update_building(building, components, s, use_roof_sq=config['use_roof_sq'])
-            s = _ren(s)
-            s.update(get_soultion_metrics(building))
-            _print(f"solution for building {b['uuid']}: {s}")
-            data_tables['solution_data'] = ConstraintSolver(building, components, config=config).save_solution(data_tables['solution_data'], building, s, storage=solution_dir)
-            if config['save_opt_production']:
-                data_tables['production_data'] = building.save_production(data_tables['production_data'], storage=production_dir)
 
-    save_pickle(data_tables, os.path.join(base_dir, 'components.pickle'))  
-    
-    Solution = dict(
-        uuid = None,
-        timestamp = 1692989661.8293242,
-        building = None,
-        #selected = 0,
-        solution_profile_key = '5c75deb8d33045cd86bb3ee9b7e98c25',
-        components = dict(
-            locations = OrderedDict(),
-            equipment = OrderedDict(),
-            batteries = OrderedDict(),
-        ),
-    
-    '''
     
 def save_solutions(solution_data, solutions, timestamp=None, uuid=None, storage='./'):
         data_key = equip.Solution.copy()

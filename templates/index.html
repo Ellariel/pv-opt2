@@ -127,6 +127,7 @@
                     value += '&min_equipment_count='+document.getElementById('min_equipment_count').value;
                     value += '&shown_solutions_limit='+document.getElementById('shown_solutions_limit').value;
                     value += '&battery_capacity_uplimit='+document.getElementById('battery_capacity_uplimit').value;
+                    value += '&use_ray='+document.getElementById('use_ray').value;
                     value += '&ray_rate='+document.getElementById('ray_rate').value;
                     value += '&num_cpus='+document.getElementById('num_cpus').value;
 
@@ -152,6 +153,7 @@
                             document.getElementById('min_equipment_count').value = req.min_equipment_count;
                             document.getElementById('shown_solutions_limit').value = req.shown_solutions_limit;
                             document.getElementById('battery_capacity_uplimit').value = req.battery_capacity_uplimit;
+                            document.getElementById('use_ray').value = req.use_ray;
                             document.getElementById('ray_rate').value = req.ray_rate;
                             document.getElementById('num_cpus').value = req.num_cpus;
                         }
@@ -321,6 +323,8 @@
                                             <td><div>shown_solutions_limit:</td><td><input type="text" name="shown_solutions_limit" id="shown_solutions_limit"/><br /></div></td>
                                         <tr>
                                             <td><div>battery_capacity_uplimit:</td><td><input type="text" name="battery_capacity_uplimit" id="battery_capacity_uplimit"/><br /></div></td>
+                                        <tr>
+                                            <td><div>use_ray:</td><td><input type="text" name="use_ray" id="use_ray"/><br /></div></td>
                                         <tr>
                                             <td><div>ray_rate:</td><td><input type="text" name="ray_rate" id="ray_rate"/><br /></div></td>
                                         <tr>

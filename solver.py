@@ -33,6 +33,7 @@ CACHED_CONGIF_KEYS = {
             'min_equipment_count': False, 
             'shown_solutions_limit': False,
             'battery_capacity_uplimit': False,
+            'use_ray': False,
             'ray_rate': False,
             'num_cpus': False,     
 }
