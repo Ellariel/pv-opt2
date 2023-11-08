@@ -1,3 +1,7 @@
+gui.exe is executable
+
+
+
 # max: Genossenschaft profit = (SPO * BP) + (SEC * CP) – IC - roof renting costs   
 # min: building energy cost = (SEC * CP) + (SPU * SP) + roof renting costs
 # grid buying price BP: price at which the respective energy provider is buying energy per kwh

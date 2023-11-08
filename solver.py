@@ -86,7 +86,7 @@ def _hash_config(config):
 
 
 class ConstraintSolver:
-    def __init__(self, building, components, pvgis=None, local_cache_dir=SOLVER_DEFAULT_CACHE_DIR, config={}):
+    def __init__(self, building, components, pvgis=None, local_cache_dir=SOLVER_DEFAULT_CACHE_DIR, config={}, fixed_solution=None):
         self.key_name = SOLVER_DEFAULT_CACHE_FILE
         self.local_cache_dir = local_cache_dir
         #if self.local_cache_dir:
@@ -97,6 +97,7 @@ class ConstraintSolver:
         #    self.cache = {} #FaaSCacheDict()
         self.cache = {}    
             
+        self.fixed_solution = fixed_solution
         self.components = components
         self.building = building
         self.config = config
@@ -111,25 +112,40 @@ class ConstraintSolver:
         print(f"equipment_combinations: {self.equipment_combinations}")
         print(f"battery_combinations: {self.battery_combinations}")               
         max_equipment_count = int(np.max([equip.get_max_equipment_count_for_location(loc, eq, **self.config) 
-                                    for i, loc in self.filtered_locations.items() 
-                                        for j, eq in self.components['equipment'].items()]))
+                                        for i, loc in self.filtered_locations.items() 
+                                            for j, eq in self.components['equipment'].items()]))
         print(f"estimated_max_equipment_count: {max_equipment_count}, config_max_equipment_count: {self.config['max_equipment_count']}")
         max_equipment_count = min(max_equipment_count, self.config['max_equipment_count'])
-        equipment_count_range = calc_range(self.config['min_equipment_count'], max_equipment_count)
-        print(f"equipment_count_range: {equipment_count_range}")
+        self.equipment_count_range = calc_range(self.config['min_equipment_count'], max_equipment_count)
+        self.battery_count_range = self.equipment_count_range.copy()
+        print(f"equipment_count_range: {self.equipment_count_range}")
+        print(f"battery_count_range: {self.battery_count_range}")
+        if self.fixed_solution:
+            print(f"fixed solution determined:")
+            if len(self.fixed_solution['components']['locations'].items()):
+                self.location_combinations = [tuple([k for k, v in self.fixed_solution['components']['locations'].items()])]
+            if len(self.fixed_solution['components']['equipment'].items()):
+                self.equipment_combinations = [(k, ) for k, v in self.fixed_solution['components']['equipment'].items()]
+                self.equipment_count_range = [(v['pv_count'] ,) for k, v in self.fixed_solution['components']['equipment'].items()]
+            if len(self.fixed_solution['components']['batteries'].items()):
+                self.battery_combinations = [(k, ) for k, v in self.fixed_solution['components']['batteries'].items()]
+                self.battery_count_range = [(v['battery_count'] ,) for k, v in self.fixed_solution['components']['batteries'].items()]
+            print(f"location_combinations: {self.location_combinations}")
+            print(f"equipment_combinations: {self.equipment_combinations} {self.equipment_count_range}")
+            print(f"battery_combinations: {self.battery_combinations} {self.battery_count_range}")
                 
         self.problem = constraint.Problem()
 
         self.problem.addVariable('A', self.location_combinations) # locations involved
         self.problem.addVariable('B', self.equipment_combinations) # equipment involved  
-        self.problem.addVariable('C', equipment_count_range) # equipment count
+        self.problem.addVariable('C', self.equipment_count_range) # equipment count
              
         if self.config['autonomy_period_days'] == 0:
             self.problem.addVariable('D', [('NONE',)]) # none of batteries
             self.problem.addVariable('E', [(0,)]) # battery count 
         else:
             self.problem.addVariable('D', self.battery_combinations) # batteries involved
-            self.problem.addVariable('E', [(0,)] + equipment_count_range)
+            self.problem.addVariable('E', [(0,)] + self.battery_count_range)
                 
         self.problem.addConstraint(self.equipment_area_needed_constraint, "ABCDE")
         self.problem.addConstraint(self.battery_capacity_constraint, "ABCDE") 

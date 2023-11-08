@@ -10,6 +10,12 @@ import numbers
 import copy
 from uuid import uuid4
 import gc
+import asyncio
+import functools
+import time
+from multiprocessing import Manager
+from concurrent.futures import ProcessPoolExecutor
+
 
 import equip
 #from equip import Building, Equipment, Location, Battery
@@ -35,7 +41,7 @@ config = {
             'min_payback_perod': 5,
             'max_equipment_count': 150,
             'min_equipment_count': 10, 
-            'shown_solutions_limit': 5,
+            'shown_solutions_limit': 10,
             'battery_capacity_uplimit': 2.0,
             'use_ray': 0,
             'ray_rate': 1.0,
@@ -68,54 +74,10 @@ def _print(value, clear=False):
         log = ''
     log += '\n' + value
     print(value)    
-'''
-_rename = {'A': 'location_uuid',
-           'B': 'equipment_uuid',
-           'C': 'equipment_count',
-           'D': 'battery_uuid',
-           'E': 'battery_count',
-           }
+    
+    
 
-def _ren(s):
-    global components
-    def _match(k, v):
-        if 'uuid' in k:
-            k = k.split('_')[0]
-            if isinstance(v, (int, str)):
-                return components[k][v]['uuid']
-            elif isinstance(v, tuple):
-                return [components[k][i]['uuid'] for i in v]
-        return v
-    _r = {}
-    for k, v in s.items():
-        if k in _rename:   
-            k = _rename[k]
-            #v = _match(k, v)
-            _r.update({k: v})
-    return _r
-'''        
-'''
-def _get_soultion_metrics(building):
-    metrics = {
-        'building': building.uuid,
-        'total_production': building.production['production'].sum(),
-        'total_consumption': building.consumption['consumption'].sum(),
-        'total_solar_energy_consumption': building.total_solar_energy_consumption,
-        'total_solar_energy_underproduction': building.total_solar_energy_underproduction,
-        'total_solar_energy_overproduction': building.total_solar_energy_overproduction,
-        'total_building_energy_costs': total_building_energy_costs(building, **config),
-        'locations_involved': len(building._locations),
-        'total_renting_costs': building.total_renting_costs,
-        'equipment_units_used': sum([eq['pv_count'] for loc in building._locations for eq in loc['_equipment']]),
-        'total_equipment_costs': building.total_equipment_costs,
-        'baterry_units_used': sum([bt['battery_count'] for bt in building._battery]),
-        'total_battery_costs': building.total_battery_costs,
-        'total_installation_costs': total_installation_costs(building, **config),
-        'genossenschaft_profit': genossenschaft_profit(building, **config),
-    }
-    #_print(str(metrics))
-    return metrics
-'''    
+    
 def update_config(new_config):
     global config
     config.update(new_config)
@@ -168,14 +130,14 @@ def init_components(base_dir, upload_dir=None):
     components['battery'] = data_tables['battery_data'].to_dict(orient='index')
     #buildings = data_tables['building_data'].iloc[0:1].to_dict(orient='index')
     buildings = data_tables['building_data'].to_dict(orient='index')
-    #try:   
-    for k, v in buildings.items():
-        if v['production_profile_key'] != None and not isinstance(v['production'], pd.Series):
-                equip.load_production_profile(v, production_storage=production_dir)
-        if v['consumption_profile_key'] != None and not isinstance(v['consumption'], pd.Series):
-                equip.load_consumption_profile(v, consumption_storage=consumption_dir) 
-    #except Exception as e:
-    #    print(e)
+    try:   
+        for k, v in buildings.items():
+            if v['production_profile_key'] != None and not isinstance(v['production'], pd.Series):
+                    equip.load_production_profile(v, production_storage=production_dir)
+            if v['consumption_profile_key'] != None and not isinstance(v['consumption'], pd.Series):
+                    equip.load_consumption_profile(v, consumption_storage=consumption_dir) 
+    except Exception as e:
+        print(e)
     
     #print(data_tables['building_data'])
     #print(buildings) 
@@ -185,35 +147,6 @@ def init_components(base_dir, upload_dir=None):
     _print(f"    equipment: {len(components['equipment'])}, batteries: {len(components['battery'])},")
     _print(f"    stored solutions: {len(data_tables['solution_data'])}") 
     
-    #print(data_tables['production_data'])
-    '''
-    for idx, item in data_tables['building_data'].iterrows():
-        #try:        
-            b = equip.Building(**item.to_dict())
-            b.load_production(data_tables['production_data'], storage=production_dir)
-            b.load_consumption(data_tables['consumption_data'], storage=consumption_dir)
-            for idx, item in data_tables['location_data'][data_tables['location_data']['building_uuid'] == b.uuid].iterrows():
-                loc = equip.Location.copy()
-                loc.update(item.to_dict())
-                b._locations.append(loc)
-            b.updated(update_production=False)
-            #print(b.production['production'].sum())
-            building_objects.append(b)
-        #except Exception as e:
-        #    print(f'error loading building {b.uuid}: {str(e)}')
-    '''
-'''
-def dict_to_building(building_dict):
-        global components, buildings, data_tables, config
-        b = equip.Building(**building_dict)
-        b.load_production(data_tables['production_data'], storage=production_dir)
-        b.load_consumption(data_tables['consumption_data'], storage=consumption_dir)
-        for idx, item in data_tables['location_data'][data_tables['location_data']['building_uuid'] == b.uuid].iterrows():
-                loc = equip.Location.copy()
-                loc.update(item.to_dict())
-                b._locations.append(loc)
-        return b
-'''
 def calculate(base_dir):   
     global components, buildings, data_tables, config
     
@@ -228,12 +161,36 @@ def calculate(base_dir):
             print(f"solving building: {uuid}")
             try:
                 _start_time = time.time()
-                solver = ConstraintSolver(b, components, pvgis, config=config)
-                results[uuid] = solver.get_solutions()   
+                _config = config.copy()
+                _config['autonomy_period_days'] = 0
+                solver = ConstraintSolver(b, components, pvgis, config=_config)
+                results[uuid] = solver.get_solutions()
+                del solver
                 print(f"{uuid} solving time: {format_timespan(time.time() - _start_time)}")
-                print(f"possible solutions for building {uuid}: {len(results[uuid])}")
+                _print(f"possible solutions for building {uuid}: {len(results[uuid])}")  
+                
+                if config['autonomy_period_days'] != 0:
+                    _start_time = time.time()
+                    print(f"attempt to select batteries for building {uuid}")
+                    _config['autonomy_period_days'] = config['autonomy_period_days']
+                    modified_solutions = {}
+                    results[uuid] = sorted(results[uuid], reverse=False, key=lambda x: x['solution_energy_costs'])
+                    for s in results[uuid][:config['shown_solutions_limit']]:#[:1]:
+                        if uuid not in modified_solutions:
+                            modified_solutions[uuid] = []
+                        s['components']['batteries'] = OrderedDict()
+                        solver = ConstraintSolver(b, components, pvgis, config=_config, fixed_solution=s)
+                        modified_solutions[uuid] += solver.get_solutions() 
+                        _print(f"possible solutions with batteries for building {uuid}: {len(modified_solutions[uuid])}")       
+                        del solver          
+                        #collected = gc.collect()
+                        #if collected:
+                        #    print("Garbage collector: collected %d objects" % collected)     
+                    results[uuid] = modified_solutions[uuid]
+                    print(f"{uuid} solving time: {format_timespan(time.time() - _start_time)}")
+                    
             except Exception as e:
-                print(f"some error occur while calculating building {uuid}: {str(e)}")
+                print(f"some errors occured while calculating building {uuid}: {str(e)}")
     else:
         import ray
         ray.init(ignore_reinit_error=True)#, num_cpus=4) # log_to_driver=False
@@ -246,10 +203,11 @@ def calculate(base_dir):
                 pvgis = PVGIS(verbose=True)
                 _start_time = time.time()
                 solver = ConstraintSolver(building, components, pvgis, config=config)
-                solutions = solver.get_solutions()   
+                solutions = solver.get_solutions()  
+                del solver 
                 print(f"{building['uuid']} solving time: {format_timespan(time.time() - _start_time)}")
             except Exception as e:
-                print(f"some error occur while calculating building {building['uuid']}: {str(e)}")
+                print(f"some errors occured while calculating building {building['uuid']}: {str(e)}")
             return solutions 
 
         if config['autonomy_period_days'] == 0:

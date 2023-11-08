@@ -3,7 +3,7 @@ xcopy consumption gui.dist\consumption /i /e /y
 xcopy production gui.dist\production /i /e /y
 xcopy solution gui.dist\solution /i /e /y
 xcopy static gui.dist\static /i /e /y
-xcopy template gui.dist\template /i /e /y
+xcopy templates gui.dist\templates /i /e /y
 xcopy /y components.pickle gui.dist
 xcopy /y components.xlsx gui.dist
 xcopy /y cache.pickle gui.dist
