@@ -12,6 +12,7 @@ from werkzeug.utils import secure_filename
 import sys
 import random
 import threading
+import pandas as pd
 import os
 import multiprocessing
 import gc
@@ -190,21 +191,25 @@ def api_table(table_name):
     else:
         return jsonify({'table_name': table_name, 'data': '', 'cols': '', 'exception': 'No such a table name!'})
 
-@app.route('/api/v1.0/figure/<string:building_uuid>/<string:data_type>')
+@app.route('/api/v1.0/figure/<string:source>/<string:data_type>/<string:uuid>')
 #@auth.login_required
-def api_figure(building_uuid, data_type):
-    #print(data_type, building_uuid)
+def api_figure(source, data_type, uuid):
+    #print(source, data_type, uuid)
     try:
-        for b in main.building_objects:
-            #print(b.uuid, building_uuid)
-            if b.uuid == building_uuid:
-                d = b.consumption if data_type == 'consumption' else b.production
-                #print(data_type, building_uuid, f'{d[d.columns[0]].sum()/1000:.1f}')
-                file_name = os.path.join(figures_dir, get_hash(d)+'.png')
-                if not os.path.exists(file_name):
-                    make_figure(d, file_name)
-                return jsonify({'image_url': get_encoded_img(file_name), 'exception': ''})
-        return jsonify({'image_url': '', 'exception': 'Image error: no matched building uuid!'})
+        d = pd.Series()
+        if source == 'building':
+            d = main.buildings[uuid][data_type]
+        elif source == 'solution':
+            _, s = main.load_solutions(main.data_tables['solution_data'], uuid, storage=main.solution_dir)
+            if s:
+                d = s[0]['building'][data_type]
+                #print(d)
+        if len(d):
+            file_name = os.path.join(figures_dir, get_hash(d)+'.png')
+            if not os.path.exists(file_name):
+                make_figure(d, file_name)
+            return jsonify({'image_url': get_encoded_img(file_name), 'exception': ''})
+        return jsonify({'image_url': '', 'exception': 'Image error: no matched uuid!'})
     except Exception as e:
         jsonify({'image_url': '', 'exception': f'Image error: {str(e)}'})
 

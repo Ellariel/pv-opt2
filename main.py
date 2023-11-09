@@ -270,9 +270,8 @@ def save_solutions(solution_data, solutions, timestamp=None, uuid=None, storage=
         to_storage(data_key['solutions_profile_key'], solutions, storage=storage)
         return pd.concat([solution_data, pd.DataFrame.from_dict({0: data_key}, orient='index')], ignore_index=True)
     
-def load_solutions(self, solution_data, building_uuid, timestamp=None, uuid=None, storage='./'):
-        query = f"`building_uuid` == {building_uuid}"
-        query += f" & `uuid` == {uuid}" if uuid != None else ''
+def load_solutions(solution_data, uuid=None, timestamp=None, storage='./'):
+        query = f"`uuid` == '{uuid}'"
         query += f" & `timestamp` == {timestamp}" if timestamp != None else ''
         filtered = solution_data.query(query)
         if not is_empty(filtered):

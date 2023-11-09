@@ -44,7 +44,8 @@ def get_encoded_img(image_path):
 def make_figure(data, file_name):
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(6, 4))
     data.resample('W').mean().plot(ax=ax)
-    fig.text(0.2, 0.22, f"Yearly total: {data[data.columns[0]].sum()/1000:.1f} kWh", ha='left')
+    fig.text(0.2, 0.22, f"Yearly total: {data.sum()/1000:.1f} kWh", ha='left')
+    
     #loc = plticker.MultipleLocator(base=30.0)
     #ax.xaxis.set_major_locator(loc)
     plt.xticks(rotation=90)
