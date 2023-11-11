@@ -41,14 +41,29 @@ def get_encoded_img(image_path):
     image = base64.b64encode(buf).decode('ascii')
     return image
 
-def make_figure(data, file_name):
+def make_timeserie_figure(data, file_name):
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(6, 4))
     data.resample('W').mean().plot(ax=ax)
     fig.text(0.2, 0.22, f"Yearly total: {data.sum()/1000:.1f} kWh", ha='left')
-    
     #loc = plticker.MultipleLocator(base=30.0)
     #ax.xaxis.set_major_locator(loc)
+    plt.ylabel('Power produced/consumed, Wh')
     plt.xticks(rotation=90)
+    plt.tight_layout()    
+    fig.savefig(file_name)
+    plt.close(fig)
+    
+def make_metrics_figure(data, file_name):
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(6, 4))
+
+    ax.scatter(data['solution_energy_costs'], data['genossenschaft_value'], s=45, alpha=0.5)
+    
+    for i, d in data.iterrows():
+        ax.annotate(f"{i+1} ({d['genossenschaft_payback_perod']})", (d['solution_energy_costs'], d['genossenschaft_value']))
+    
+    fig.text(0.1, 0.0, f"Discounted payback perod in (), years. Alternative energy costs: {d['alternative_energy_costs']:.2f}, €/year", ha='left')
+    plt.xlabel('Solution energy costs, €/year')
+    plt.ylabel('Genossenschaft value, €/year')
     plt.tight_layout()    
     fig.savefig(file_name)
     plt.close(fig)

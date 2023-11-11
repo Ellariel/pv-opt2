@@ -81,14 +81,16 @@
             }
             function request_table(table_name) {
                 function add_pclink(idx){
-                                        item = $(this).find('td').first();
-                                        item.html(item.text() + '&nbsp;&nbsp;<a href="javascript: new_imagetab(\''+item.text()+'\', \'production\', \'solution\');">P</a>&nbsp;&nbsp;<a href="javascript: new_imagetab(\''+item.text()+'\', \'consumption\', \'solution\');">C</a>');
+                                        first = $(this).find('td').first();
+                                        item = first.next();
+                                        item.html('&nbsp;&nbsp;<a href="javascript: new_imagetab(\''+first.text()+'\', \'production\', \'solution\');">P</a>&nbsp;&nbsp;<a href="javascript: new_imagetab(\''+first.text()+'\', \'consumption\', \'solution\');">C</a>&nbsp;&nbsp;<a href="javascript: new_imagetab(\''+first.text()+'\', \'metrics\', \'solution\');">S</a>');
                                         //item.tex = '<a>' + item.innerHTML + '</a>';
                                         //$(this).append('<div style="display:inline-block;float:left;position:absolute;"><a href="link'+i+'" >Button '+item.text()+'</a></div>');
                             }
                 function add_clink(idx){
-                                        item = $(this).find('td').first();
-                                        item.html(item.text() + '&nbsp;&nbsp;<a href="javascript: new_imagetab(\''+item.text()+'\', \'consumption\', \'building\');">C</a>');
+                                        first = $(this).find('td').first();
+                                        item = first.next();
+                                        item.html('&nbsp;&nbsp;<a href="javascript: new_imagetab(\''+first.text()+'\', \'consumption\', \'building\');">C</a>');
                                         //item.tex = '<a>' + item.innerHTML + '</a>';
                                         //$(this).append('<div style="display:inline-block;float:left;position:absolute;"><a href="link'+i+'" >Button '+item.text()+'</a></div>');
                             }                            

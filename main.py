@@ -19,7 +19,7 @@ from concurrent.futures import ProcessPoolExecutor
 
 import equip
 #from equip import Building, Equipment, Location, Battery
-from utils import save_pickle, load_pickle, move_files, make_figure, from_storage, to_storage, is_empty
+from utils import save_pickle, load_pickle, move_files, from_storage, to_storage, is_empty
 from solver import ConstraintSolver#, total_building_energy_costs, total_installation_costs, genossenschaft_profit, _update_building
 
 #from pvutils import PVGIS
@@ -261,14 +261,34 @@ def save_solutions(solution_data, solutions, timestamp=None, uuid=None, storage=
         data_key = equip.Solution.copy()
         data_key['uuid'] = uuid if uuid != None else uuid4().hex
         data_key['timestamp'] = timestamp if timestamp != None else time.time()
+        data_key['solutions_profile_key'] = uuid4().hex
+        data_key['config'] = str(solutions[0]['config'])
+        del data_key['components']
+        del data_key['building']
+        del data_key['metrics']
+        data = pd.DataFrame([{**i['metrics'], **data_key} for i in solutions])
+        data['n'] = data.index + 1
+        for c in data.columns:
+            if data[c].dtype == 'object':
+                data[c] = data[c].apply(lambda x: str(x))     
+        to_storage(data_key['solutions_profile_key'], solutions, storage=storage)
+        return pd.concat([solution_data, data], ignore_index=True)
+    
+'''
+def save_solutions(solution_data, solutions, timestamp=None, uuid=None, storage='./'):
+        data_key = equip.Solution.copy()
+        data_key['uuid'] = uuid if uuid != None else uuid4().hex
+        data_key['timestamp'] = timestamp if timestamp != None else time.time()
         data_key['building_uuid'] = solutions[0]['building']['uuid']
         data_key['metrics'] = str(solutions[0]['metrics'])
         data_key['config'] = str(solutions[0]['config'])
         data_key['solutions_profile_key'] = uuid4().hex
+        #data_key.update(solutions[0]['metrics'])
         del data_key['components']
         del data_key['building']
         to_storage(data_key['solutions_profile_key'], solutions, storage=storage)
         return pd.concat([solution_data, pd.DataFrame.from_dict({0: data_key}, orient='index')], ignore_index=True)
+'''
     
 def load_solutions(solution_data, uuid=None, timestamp=None, storage='./'):
         query = f"`uuid` == '{uuid}'"

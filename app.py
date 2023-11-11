@@ -19,7 +19,7 @@ import gc
 #import time
 #from main import *
 
-from utils import get_hash, get_encoded_img, make_figure
+from utils import get_hash, get_encoded_img, make_timeserie_figure, make_metrics_figure
 import main
 
 class CalculationThread(threading.Thread):
@@ -202,12 +202,17 @@ def api_figure(source, data_type, uuid):
         elif source == 'solution':
             _, s = main.load_solutions(main.data_tables['solution_data'], uuid, storage=main.solution_dir)
             if s:
-                d = s[0]['building'][data_type]
-                #print(d)
+                if data_type == 'metrics':
+                    d = pd.DataFrame([i['metrics'] for i in s])
+                else:
+                    d = s[0]['building'][data_type]
         if len(d):
             file_name = os.path.join(figures_dir, get_hash(d)+'.png')
             if not os.path.exists(file_name):
-                make_figure(d, file_name)
+                if data_type == 'metrics':
+                    make_metrics_figure(d, file_name) 
+                else:
+                    make_timeserie_figure(d, file_name)
             return jsonify({'image_url': get_encoded_img(file_name), 'exception': ''})
         return jsonify({'image_url': '', 'exception': 'Image error: no matched uuid!'})
     except Exception as e:
