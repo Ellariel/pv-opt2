@@ -53,21 +53,7 @@ class CalculationThread(threading.Thread):
         self.finished = True
         print(f"{self.thread_id} - is finished")
 
-base_dir = './'
-upload_dir = os.path.join(base_dir, 'upload')
-download_dir = os.path.join(base_dir, 'download')
-#files_types = ['consumption_file', 'production_file', 'excel_file']
-files_dir = {'consumption_file': os.path.join(upload_dir, 'consumption'),
-             'production_file': os.path.join(upload_dir, 'production'),
-             'excel_file': upload_dir}
-os.makedirs(upload_dir, exist_ok=True)
-os.makedirs(download_dir, exist_ok=True)
-os.makedirs(files_dir['consumption_file'], exist_ok=True)
-os.makedirs(files_dir['production_file'], exist_ok=True)
-os.makedirs(files_dir['excel_file'], exist_ok=True)
 
-figures_dir = os.path.join(base_dir, 'static/figures')
-os.makedirs(figures_dir, exist_ok=True)
 
 calculation_threads = {}
 calculation_results = {}
@@ -85,6 +71,23 @@ if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
     app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
 else:
     app = Flask(__name__, template_folder='./templates', static_folder='./static')
+    
+
+base_dir = './'
+upload_dir = os.path.join(base_dir, 'upload')
+download_dir = os.path.join(app.root_path, 'download')
+#files_types = ['consumption_file', 'production_file', 'excel_file']
+files_dir = {'consumption_file': os.path.join(upload_dir, 'consumption'),
+             'production_file': os.path.join(upload_dir, 'production'),
+             'excel_file': upload_dir}
+os.makedirs(upload_dir, exist_ok=True)
+os.makedirs(download_dir, exist_ok=True)
+os.makedirs(files_dir['consumption_file'], exist_ok=True)
+os.makedirs(files_dir['production_file'], exist_ok=True)
+os.makedirs(files_dir['excel_file'], exist_ok=True)
+
+figures_dir = os.path.join(base_dir, 'static/figures')
+os.makedirs(figures_dir, exist_ok=True)    
     
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.sqlite3'
 app.config['SECRET_KEY'] = '!secret_key!'
@@ -200,7 +203,7 @@ def api_table(table_name, format):
             filename = f'{table_name}.xlsx'
             print(f'xlsx requested: {filename}')
             table.to_excel(os.path.join(download_dir, filename))
-            return send_from_directory(download_dir, filename, as_attachment=True)
+            return send_from_directory('./download/', filename, as_attachment=True)
     else:
         return jsonify({'table_name': table_name, 'data': '', 'cols': '', 'exception': 'No such a table name!'})
 
