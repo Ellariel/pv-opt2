@@ -48,6 +48,7 @@ def make_timeserie_figure(data, file_name):
     #loc = plticker.MultipleLocator(base=30.0)
     #ax.xaxis.set_major_locator(loc)
     plt.ylabel('Power produced/consumed, Wh')
+    plt.xlabel('')
     plt.xticks(rotation=90)
     plt.tight_layout()    
     fig.savefig(file_name)

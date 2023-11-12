@@ -12,6 +12,17 @@
 
 	<script type="text/javascript">
             //alert(eval(window.location.origin + '/api/v1.0/upload'))
+            function downloadURI(uri, name) 
+            {
+                var link = document.createElement("a");
+                // If you don't know the name or want to use
+                // the webserver default set name = ''
+                link.setAttribute('download', name);
+                link.href = uri;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+            }
             function sleep(time) {
                 return new Promise((resolve) => setTimeout(resolve, time));
             }
@@ -79,7 +90,7 @@
                     check_progress();
                 });
             }
-            function request_table(table_name) {
+            function request_table(table_name, format) {
                 function add_pclink(idx){
                                         first = $(this).find('td').first();
                                         item = first.next();
@@ -93,34 +104,38 @@
                                         item.html('&nbsp;&nbsp;<a href="javascript: new_imagetab(\''+first.text()+'\', \'consumption\', \'building\');">C</a>');
                                         //item.tex = '<a>' + item.innerHTML + '</a>';
                                         //$(this).append('<div style="display:inline-block;float:left;position:absolute;"><a href="link'+i+'" >Button '+item.text()+'</a></div>');
-                            }                            
-                $.get('/api/v1.0/table/' + table_name, function(req) {
-                    if (req.exception == '') {
-                        if ($.fn.dataTable.isDataTable('#'+table_name)) {
-                            table = $('#'+table_name).DataTable({data: req.data, retrieve: true, searching: false,
-                            "fnDrawCallback": function(oSettings) {
-                                if (table_name == 'building_data') {
-                                    $('#'+table_name+' tbody').find('tr').each(add_clink);
-                                }
-                                if (table_name == 'solution_data') {
-                                    $('#'+table_name+' tbody').find('tr').each(add_pclink);
-                                }
-                            }
-                        });
-                        } else {
-                            table = new DataTable('#'+table_name, {columns: req.cols, data: req.data, searching: false,
-                            "fnDrawCallback": function(oSettings) {
-                                if (table_name == 'building_data') {
-                                    $('#'+table_name+' tbody').find('tr').each(add_clink);
-                                }
-                                if (table_name == 'solution_data') {
-                                    $('#'+table_name+' tbody').find('tr').each(add_pclink);
-                                }
-                            }
-                        });
+                            }  
+                if (format == 'browser') {                    
+                    $.get('/api/v1.0/table/' + table_name + '/' + format, function(req) {
+                        if (req.exception == '') {
+                                if ($.fn.dataTable.isDataTable('#'+table_name)) {
+                                    table = $('#'+table_name).DataTable({data: req.data, retrieve: true, searching: false,
+                                    "fnDrawCallback": function(oSettings) {
+                                        if (table_name == 'building_data') {
+                                            $('#'+table_name+' tbody').find('tr').each(add_clink);
+                                        }
+                                        if (table_name == 'solution_data') {
+                                            $('#'+table_name+' tbody').find('tr').each(add_pclink);
+                                        }
+                                    }
+                                });
+                                } else {
+                                    table = new DataTable('#'+table_name, {columns: req.cols, data: req.data, searching: false,
+                                    "fnDrawCallback": function(oSettings) {
+                                        if (table_name == 'building_data') {
+                                            $('#'+table_name+' tbody').find('tr').each(add_clink);
+                                        }
+                                        if (table_name == 'solution_data') {
+                                            $('#'+table_name+' tbody').find('tr').each(add_pclink);
+                                        }
+                                    }
+                                });
+                                } 
                         }
-                    }
-                });
+                    });
+                } else {
+                    downloadURI('/api/v1.0/table/' + table_name + '/' + format, '')                             
+                }
             }
             
             function config_update(update=false) {
@@ -217,7 +232,7 @@
             function subtab_click(tab_id) {
                 if (!document.getElementById('a_'+tab_id).classList.contains('here')) {
                     if (tab_id != 'uploading' & tab_id != 'calculation'){
-                    request_table(tab_id);
+                    request_table(tab_id, 'browser');
                     config_update();
                     }
                 }
@@ -228,6 +243,7 @@
                 document.getElementById('a_equipment_data').classList.remove('here');
                 document.getElementById('a_battery_data').classList.remove('here');
                 document.getElementById('a_'+tab_id).classList.add('here');
+                show('excel_button');
                 hide('calculation_div');
                 hide('solution_data_div');
                 hide('building_data_div');
@@ -284,7 +300,10 @@
             </ul>
         </ul>
 
-        <div id="solution_data_div"><table id="solution_data" class="display" width="100%"></table></div>
+        <div id="solution_data_div">
+            <button type="button" onclick="javascript:request_table('solution_data', 'xlsx');" id="excel_button" style="display: none;">Excel</button>
+            <table id="solution_data" class="display" width="100%"></table>
+        </div>
         <div id="building_data_div"><table id="building_data" class="display" width="100%"></table></div>
         <div id="location_data_div"><table id="location_data" class="display" width="100%"></table></div>
         <div id="equipment_data_div"><table id="equipment_data" class="display" width="100%"></table></div>

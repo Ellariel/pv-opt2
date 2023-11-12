@@ -5,6 +5,7 @@ from flask import *
 #from flask_httpauth import HTTPBasicAuth
 #from flask.ext.login import LoginManager
 from flask import render_template
+from flask import send_from_directory
 from werkzeug.utils import secure_filename
 #from werkzeug.datastructures import FileStorage
 #from flaskwebgui import FlaskUI
@@ -53,12 +54,14 @@ class CalculationThread(threading.Thread):
         print(f"{self.thread_id} - is finished")
 
 base_dir = './'
-upload_dir = os.path.join(base_dir, 'uploaded')
+upload_dir = os.path.join(base_dir, 'upload')
+download_dir = os.path.join(base_dir, 'download')
 #files_types = ['consumption_file', 'production_file', 'excel_file']
 files_dir = {'consumption_file': os.path.join(upload_dir, 'consumption'),
              'production_file': os.path.join(upload_dir, 'production'),
              'excel_file': upload_dir}
 os.makedirs(upload_dir, exist_ok=True)
+os.makedirs(download_dir, exist_ok=True)
 os.makedirs(files_dir['consumption_file'], exist_ok=True)
 os.makedirs(files_dir['production_file'], exist_ok=True)
 os.makedirs(files_dir['excel_file'], exist_ok=True)
@@ -130,6 +133,11 @@ def upload_files():
             main.init_components(base_dir, files_dir)
             print('Files uploaded successfully!')
         return index_page(files_uploaded='\nFiles uploaded successfully!\n', log=main.log)+'\n'
+    
+@app.route('/api/v1.0/download', methods=['GET'])
+#@auth.login_required
+def download_files(table_name):
+    pass
 
 @app.route('/api/v1.0/calculate')
 #@auth.login_required
@@ -175,19 +183,24 @@ def api_progress(thread_id):
     else:
         return jsonify({'task_id': thread_id, 'exception': 'Wrong task_id!'})
 
-@app.route('/api/v1.0/table/<string:table_name>')
+@app.route('/api/v1.0/table/<string:table_name>/<string:format>')
 #@auth.login_required
-def api_table(table_name):
+def api_table(table_name, format):
     if table_name in main.data_tables:
         table = main.data_tables[table_name]
-        cols = [{'title': i} for i in table.columns]
         print(f'Table is requested: {table_name}.')
-        if len(table):
-            data = [v.fillna('-').values.tolist() for k, v in table.iterrows()]
-            #print(data)
-            return jsonify({'table_name': table_name, 'data': data, 'cols': cols, 'exception': ''})
-        else:
-            return jsonify({'table_name': table_name, 'data': '', 'cols': cols, 'exception': 'Table is empty!'})
+        if format == 'browser':
+            cols = [{'title': i} for i in table.columns]
+            if len(table):
+                data = [v.fillna('-').values.tolist() for k, v in table.iterrows()]
+                return jsonify({'table_name': table_name, 'data': data, 'cols': cols, 'exception': ''})
+            else:
+                return jsonify({'table_name': table_name, 'data': '', 'cols': cols, 'exception': 'Table is empty!'})
+        elif format == 'xlsx':
+            filename = f'{table_name}.xlsx'
+            print(f'xlsx requested: {filename}')
+            table.to_excel(os.path.join(download_dir, filename))
+            return send_from_directory(download_dir, filename, as_attachment=True)
     else:
         return jsonify({'table_name': table_name, 'data': '', 'cols': '', 'exception': 'No such a table name!'})
 
@@ -216,7 +229,7 @@ def api_figure(source, data_type, uuid):
             return jsonify({'image_url': get_encoded_img(file_name), 'exception': ''})
         return jsonify({'image_url': '', 'exception': 'Image error: no matched uuid!'})
     except Exception as e:
-        jsonify({'image_url': '', 'exception': f'Image error: {str(e)}'})
+        return jsonify({'image_url': '', 'exception': f'Image error: {str(e)}'})
 
 #########################################################################
 
