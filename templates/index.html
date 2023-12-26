@@ -148,6 +148,7 @@
                     value += '&miscellaneous_coef='+document.getElementById('miscellaneous_coef').value;
                     value += '&discount_rate='+document.getElementById('discount_rate').value;
                     value += '&discount_horison='+document.getElementById('discount_horison').value;
+                    value += '&optimal_angle='+document.getElementById('optimal_angle').value;
 
                     value += '&max_investments='+document.getElementById('max_investments').value;
                     value += '&max_payback_perod='+document.getElementById('max_payback_perod').value;
@@ -175,6 +176,8 @@
                             document.getElementById('miscellaneous_coef').value = req.miscellaneous_coef;
                             document.getElementById('discount_rate').value = req.discount_rate;
                             document.getElementById('discount_horison').value = req.discount_horison;
+                            document.getElementById('optimal_angle').value = req.optimal_angle;
+
                             document.getElementById('max_investments').value = req.max_investments;
                             document.getElementById('max_payback_perod').value = req.max_payback_perod;
                             document.getElementById('min_payback_perod').value = req.min_payback_perod;
@@ -340,7 +343,11 @@
                                         <tr>
                                             <td><div>discount_rate:</td><td><input type="text" name="discount_rate" id="discount_rate"/><br /></div></td>
                                         <tr>
-                                            <td><div>discount_horison:</td><td><input type="text" name="discount_horison" id="discount_horison"/><br /></div></td>                
+                                            <td><div>discount_horison:</td><td><input type="text" name="discount_horison" id="discount_horison"/><br /></div></td> 
+                                        <tr>
+                                            <td><div>optimal_angle:</td><td><input type="text" name="optimal_angle" id="optimal_angle"/><br /></div></td> 
+                                                    
+                                                    
             
                                         <tr>
                                             <td><div>max_investments:</td><td><input type="text" name="max_investments" id="max_investments"/><br /></div></td>

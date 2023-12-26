@@ -154,17 +154,19 @@ def get_genossenschaft_payback_perod(solution, discount_rate=0.03, discount_hori
 
 # solar energy consumption SEC = min{building solar production, building consumption}
 def get_solar_energy_consumption(solution, **kwargs):
-    #if not isinstance(solution['building']['production'], pd.Series):
-    #        return 0
     return min(solution['building']['production'].sum(), solution['building']['consumption'].sum())
 
 # solar panel underproduction SPU = max{0, (building consumption - building solar production)}
 def get_solar_energy_underproduction(solution, **kwargs):
     return max(0, solution['building']['consumption'].sum() - solution['building']['production'].sum())
+    #return max(0, np.sum(solution['building']['consumption'].resample('D').sum() -\
+    #                     solution['building']['production'].resample('D').sum()))
     
 # solar panel overproduction SPO = max{0, (building solar production - building consumption)}
 def get_solar_energy_overproduction(solution, **kwargs):
     return max(0, solution['building']['production'].sum() - solution['building']['consumption'].sum())
+    #return max(0, np.sum(solution['building']['production'].resample('D').sum() -\
+    #                     solution['building']['consumption'].resample('D').sum()))
 
 def get_energy_storage_needed(solution, autonomy_period_days=-1, **kwargs):
     if autonomy_period_days == 0:
