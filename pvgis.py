@@ -30,6 +30,8 @@ def _request_PVGIS(datatype='hourly', pvtechchoice='CIS', slope=0, azimuth=0, mo
     # angle (0° -- 90°): the inclination angle or slope of the PV modules from the horizontal plane, for a fixed (non-tracking) mounting.
     # OUTPUT:
     # P_W per 1 kW peak -> {"P": {"description": "PV system power", "units": "W"} ...
+    # optimalinclination	Calculate the optimum inclination angle. Value of 1 for "yes". All other values (or no value) mean "no"
+    # optimalangles Calculate the optimum inclination AND orientation angles. Value of 1 for "yes". All other values (or no value) mean "no".
     
     if datatype=='hourly':
       req = f"{PVGIS_ENDPOINT}api/seriescalc?outputformat=json&pvcalculation=1&peakpower=1&mountingplace={mountingplace}"+\
