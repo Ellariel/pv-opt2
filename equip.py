@@ -52,6 +52,7 @@ Location = dict(
         area_sqm = 100,
         price_per_sqm = 1,
         area_used_sqm = 0,
+        flat = 0,
         #pv_area_used = 0,
         #lat = 52.373,
         #lon = 9.738,
@@ -155,23 +156,23 @@ def get_genossenschaft_payback_perod(solution, discount_rate=0.03, discount_hori
 # solar energy consumption SEC = min{building solar production, building consumption}
 def get_solar_energy_consumption(solution, **kwargs):
     #return min(solution['building']['production'].sum(), solution['building']['consumption'].sum())
-    result = np.minimum(solution['building']['consumption'].resample('D').sum().fillna(0),
-                        solution['building']['production'].resample('D').sum().fillna(0))
+    result = np.minimum(solution['building']['consumption'].fillna(0).resample('D').sum(),
+                        solution['building']['production'].fillna(0).resample('D').sum())
     return result.sum()
 
 # solar panel underproduction SPU = max{0, (building consumption - building solar production)}
 def get_solar_energy_underproduction(solution, **kwargs):
     #return max(0, solution['building']['consumption'].sum() - solution['building']['production'].sum())
-    diff = solution['building']['consumption'].resample('D').sum().fillna(0) -\
-           solution['building']['production'].resample('D').sum().fillna(0)
+    diff = solution['building']['consumption'].fillna(0).resample('D').sum() -\
+           solution['building']['production'].fillna(0).resample('D').sum()
     diff = np.where(diff < 0, 0, diff)
     return diff.sum()
        
 # solar panel overproduction SPO = max{0, (building solar production - building consumption)}
 def get_solar_energy_overproduction(solution, **kwargs):
     #return max(0, solution['building']['production'].sum() - solution['building']['consumption'].sum())
-    diff = solution['building']['production'].resample('D').sum().fillna(0) -\
-           solution['building']['consumption'].resample('D').sum().fillna(0)
+    diff = solution['building']['production'].fillna(0).resample('D').sum() -\
+           solution['building']['consumption'].fillna(0).resample('D').sum()
     diff = np.where(diff < 0, 0, diff)
     return diff.sum()
 
@@ -220,14 +221,24 @@ def get_max_equipment_count_for_location(loc, eq, **kwargs):
 def calc_equipment_allocation(solution, pvgis=None, calc_production=False, **kwargs):
     #print(solution)
     #solution = copy.deepcopy(solution)
+
+    
     def get_nominal_production(eq, loc): # Watt per 1 kWp
         if pvgis:
+            optimal_angle = kwargs.get('optimal_angle', False)
+            optimal_both = kwargs.get('optimal_both', False)
+            if loc['flat']:
+                print('flat_roof')
+                optimal_angle = True
             return pvgis.get_production_timeserie(slope=loc['slope'],
                                               azimuth=loc['azimuth'], 
                                               pvtech=eq['type'], 
                                               system_loss=eq['pv_system_loss'], 
                                               lat=solution['building']['lat'], 
-                                              lon=solution['building']['lon'])    
+                                              lon=solution['building']['lon'],
+                                              optimal_angle=optimal_angle,
+                                              optimal_both=optimal_both,
+                                              )    
     total_production = None
     allocation_area_used = {}
     allocation_equipment = {}
@@ -260,7 +271,10 @@ def calc_equipment_allocation(solution, pvgis=None, calc_production=False, **kwa
         allocation_equipment[eq['uuid']] = allocation_equipment[eq['uuid']] + eq_count if eq['uuid'] in allocation_equipment else eq_count
         
         if calc_production:
-            production = get_nominal_production(eq, loc) * (eq['pv_watt_peak'] / 1000) * eq_count    
+            production, info = get_nominal_production(eq, loc)
+            #print(production.sum())
+            if isinstance(production, pd.Series):
+                production = production * (eq['pv_watt_peak'] / 1000) * eq_count    
             total_production = total_production + production if isinstance(total_production, pd.Series) else production
     solution['building']['production'] = total_production
     

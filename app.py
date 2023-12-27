@@ -14,9 +14,10 @@ import sys
 import random
 import threading
 import pandas as pd
+import numpy as np
 import os
 import multiprocessing
-import gc
+#import gc
 #import time
 #from main import *
 
@@ -195,7 +196,7 @@ def api_table(table_name, format):
         if format == 'browser':
             cols = [{'title': i} for i in table.columns]
             if len(table):
-                data = [v.fillna('-').values.tolist() for k, v in table.iterrows()]
+                data = [v.fillna('-').replace([np.inf, -np.inf], '-').values.tolist() for k, v in table.iterrows()]
                 return jsonify({'table_name': table_name, 'data': data, 'cols': cols, 'exception': ''})
             else:
                 return jsonify({'table_name': table_name, 'data': '', 'cols': cols, 'exception': 'Table is empty!'})

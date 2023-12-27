@@ -19,7 +19,8 @@ def _format_datetime(s):
     return datetime.datetime.strptime(s, "%Y%m%d:%H%M")
 
 def _request_PVGIS(datatype='hourly', pvtechchoice='CIS', slope=0, azimuth=0, mountingplace='building', 
-                   system_loss=14, lat=52.373, lon=9.738, startyear=2016, endyear=2016, retry_timeout_sec=3, max_retries=3):
+                   system_loss=14, lat=52.373, lon=9.738, startyear=2016, endyear=2016, 
+                   retry_timeout_sec=3, max_retries=3, optimal_angle=False, optimal_both=False):
     # https://re.jrc.ec.europa.eu/pvg_tools/en/tools.html
     # https://joint-research-centre.ec.europa.eu/photovoltaic-geographical-information-system-pvgis/getting-started-pvgis/api-non-interactive-service_en
     # INPUT:
@@ -32,6 +33,9 @@ def _request_PVGIS(datatype='hourly', pvtechchoice='CIS', slope=0, azimuth=0, mo
     # P_W per 1 kW peak -> {"P": {"description": "PV system power", "units": "W"} ...
     # optimalinclination	Calculate the optimum inclination angle. Value of 1 for "yes". All other values (or no value) mean "no"
     # optimalangles Calculate the optimum inclination AND orientation angles. Value of 1 for "yes". All other values (or no value) mean "no".
+    
+    if optimal_angle:
+        print('optimal_angle', optimal_angle)
     
     if datatype=='hourly':
       req = f"{PVGIS_ENDPOINT}api/seriescalc?outputformat=json&pvcalculation=1&peakpower=1&mountingplace={mountingplace}"+\
@@ -69,7 +73,9 @@ class PVGIS(object):
             self.cache = FaaSCacheDict()
             
     @functools.cache
-    def get_radiation_data(self, slope=0, azimuth=0, pvtech='CIS', lat=52.373, lon=9.738, system_loss=14, datayear=2016, datatype='hourly'):  
+    def get_radiation_data(self, slope=0, azimuth=0, pvtech='CIS', 
+                           lat=52.373, lon=9.738, system_loss=14, datayear=2016, datatype='hourly',
+                           optimal_angle=False, optimal_both=False):  
 
         api_parameters = ', '.join([f"{k}:{v}" for k, v in sorted(locals().items(), key=lambda item: item[0]) if k not in ['self']])     
         request_key = _get_hash(api_parameters)
@@ -83,20 +89,28 @@ class PVGIS(object):
                                  lat=lat, lon=lon,
                                  startyear=datayear,
                                  endyear=datayear,
-                                 datatype=datatype)
+                                 datatype=datatype,
+                                 optimal_angle=optimal_angle,
+                                 optimal_both=optimal_both)
         else:
             if self.verbose:
                 print(f'getting cached PVGIS data, {api_parameters}')
         return self.cache[request_key]
 
     @functools.cache
-    def get_production_timeserie(self, slope=0, azimuth=0, pvtech='CIS', lat=52.373, lon=9.738, system_loss=14, datayear=2016, datatype='hourly', name='production'):
+    def get_production_timeserie(self, slope=0, azimuth=0, pvtech='CIS', 
+                                 lat=52.373, lon=9.738, system_loss=14, 
+                                 datayear=2016, datatype='hourly', name='production', 
+                                 optimal_angle=False, optimal_both=False):
         # makes float64 timeserie with DatetimeIndex, Name: production, Length: 8784, dtype: float64
         data_json = self.get_radiation_data(slope=slope, azimuth=azimuth, 
-                                            pvtech=pvtech, lat=lat, lon=lon, 
+                                            pvtech=pvtech, lat=lat, lon=lon,
                                             system_loss=system_loss, 
-                                            datayear=datayear, datatype=datatype)
-        return pd.Series({_format_datetime(i['time']) : i['P'] for i in data_json['outputs'][datatype]}, name=name)
+                                            datayear=datayear, datatype=datatype,
+                                            optimal_angle=optimal_angle, optimal_both=optimal_both)
+        production = pd.Series({_format_datetime(i['time']) : i['P'] for i in data_json['outputs'][datatype]}, name=name)
+        info = {}
+        return production, info
         
 if __name__ == "__main__":
     print(PVGIS(local_cache_dir=None, verbose=True).get_production_timeserie())
