@@ -28,6 +28,8 @@ CACHED_CONGIF_KEYS = {
             'discount_rate': True, 
             'discount_horison': True, 
             'optimal_angle': True,
+            'optimal_both': True,
+            
             'max_investments': False,
             'max_payback_perod': False,
             'max_equipment_count': False,

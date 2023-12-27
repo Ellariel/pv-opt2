@@ -149,6 +149,7 @@
                     value += '&discount_rate='+document.getElementById('discount_rate').value;
                     value += '&discount_horison='+document.getElementById('discount_horison').value;
                     value += '&optimal_angle='+document.getElementById('optimal_angle').value;
+                    value += '&optimal_both='+document.getElementById('optimal_both').value;
 
                     value += '&max_investments='+document.getElementById('max_investments').value;
                     value += '&max_payback_perod='+document.getElementById('max_payback_perod').value;
@@ -177,7 +178,8 @@
                             document.getElementById('discount_rate').value = req.discount_rate;
                             document.getElementById('discount_horison').value = req.discount_horison;
                             document.getElementById('optimal_angle').value = req.optimal_angle;
-
+                            document.getElementById('optimal_both').value = req.optimal_both;
+                            
                             document.getElementById('max_investments').value = req.max_investments;
                             document.getElementById('max_payback_perod').value = req.max_payback_perod;
                             document.getElementById('min_payback_perod').value = req.min_payback_perod;
@@ -346,7 +348,8 @@
                                             <td><div>discount_horison:</td><td><input type="text" name="discount_horison" id="discount_horison"/><br /></div></td> 
                                         <tr>
                                             <td><div>optimal_angle:</td><td><input type="text" name="optimal_angle" id="optimal_angle"/><br /></div></td> 
-                                                    
+                                        <tr>
+                                            <td><div>optimal_both:</td><td><input type="text" name="optimal_both" id="optimal_both"/><br /></div></td>                                                    
                                                     
             
                                         <tr>

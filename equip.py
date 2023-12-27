@@ -154,19 +154,26 @@ def get_genossenschaft_payback_perod(solution, discount_rate=0.03, discount_hori
 
 # solar energy consumption SEC = min{building solar production, building consumption}
 def get_solar_energy_consumption(solution, **kwargs):
-    return min(solution['building']['production'].sum(), solution['building']['consumption'].sum())
+    #return min(solution['building']['production'].sum(), solution['building']['consumption'].sum())
+    result = np.minimum(solution['building']['consumption'].resample('D').sum().fillna(0),
+                        solution['building']['production'].resample('D').sum().fillna(0))
+    return result.sum()
 
 # solar panel underproduction SPU = max{0, (building consumption - building solar production)}
 def get_solar_energy_underproduction(solution, **kwargs):
-    return max(0, solution['building']['consumption'].sum() - solution['building']['production'].sum())
-    #return max(0, np.sum(solution['building']['consumption'].resample('D').sum() -\
-    #                     solution['building']['production'].resample('D').sum()))
-    
+    #return max(0, solution['building']['consumption'].sum() - solution['building']['production'].sum())
+    diff = solution['building']['consumption'].resample('D').sum().fillna(0) -\
+           solution['building']['production'].resample('D').sum().fillna(0)
+    diff = np.where(diff < 0, 0, diff)
+    return diff.sum()
+       
 # solar panel overproduction SPO = max{0, (building solar production - building consumption)}
 def get_solar_energy_overproduction(solution, **kwargs):
-    return max(0, solution['building']['production'].sum() - solution['building']['consumption'].sum())
-    #return max(0, np.sum(solution['building']['production'].resample('D').sum() -\
-    #                     solution['building']['consumption'].resample('D').sum()))
+    #return max(0, solution['building']['production'].sum() - solution['building']['consumption'].sum())
+    diff = solution['building']['production'].resample('D').sum().fillna(0) -\
+           solution['building']['consumption'].resample('D').sum().fillna(0)
+    diff = np.where(diff < 0, 0, diff)
+    return diff.sum()
 
 def get_energy_storage_needed(solution, autonomy_period_days=-1, **kwargs):
     if autonomy_period_days == 0:
@@ -281,6 +288,7 @@ def calc_equipment_allocation(solution, pvgis=None, calc_production=False, **kwa
     #print(solution)
     #if calc_production:
     #    solution.update({'after_calc_production' : True})
+    check_solution_year(solution)
     return solution
 
 def from_storage(key, storage):
@@ -305,3 +313,12 @@ def save_production_profile(building, production_storage='./'):
 def save_consumption_profile(building, consumption_storage='./'):
     building['consumption_profile'] = uuid4().hex
     to_storage(building['consumption_profile_key'], building['consumption'], storage=consumption_storage)
+    
+def check_solution_year(solution):
+    if isinstance(solution['building']['production'], pd.Series) and isinstance(solution['building']['consumption'], pd.Series):
+        production_year = solution['building']['production'].index[0].year
+        consumtion_year = solution['building']['consumption'].index[0].year
+        diff = consumtion_year - production_year
+        if diff != 0:
+            solution['building']['production'].index = solution['building']['production'].index + pd.offsets.DateOffset(years=diff)
+        return diff

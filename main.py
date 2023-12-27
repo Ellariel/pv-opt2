@@ -37,6 +37,8 @@ config = {
             'discount_rate': 0.03, 
             'discount_horison': 5,   
             'optimal_angle': 0,
+            'optimal_both': 0,
+            
             'max_investments': 250000,
             'max_payback_perod': 30,
             'min_payback_perod': 5,
