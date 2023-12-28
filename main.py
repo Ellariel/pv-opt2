@@ -191,10 +191,10 @@ def calculate(base_dir):
                         #    print("Garbage collector: collected %d objects" % collected)     
                     results[uuid] = modified_solutions[uuid]
                     print(f"{uuid} solving time: {format_timespan(time.time() - _start_time)}")
-            #finally:
-            #    pass     
-            except Exception as e:
-                print(f"some errors occured while calculating building {uuid}: {str(e)}")
+            finally:
+                pass     
+            #except Exception as e:
+            #    print(f"some errors occured while calculating building {uuid}: {str(e)}")
     else:
         import ray
         ray.init(ignore_reinit_error=True)#, num_cpus=4) # log_to_driver=False

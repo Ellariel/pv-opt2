@@ -1,9 +1,10 @@
 import os
-import time
+import time#, json
 import datetime
 import requests
 import hashlib
 import pandas as pd
+import numpy as np
 import functools
 from faas_cache_dict import FaaSCacheDict
 from faas_cache_dict.file_faas_cache_dict import FileBackedFaaSCache
@@ -33,14 +34,12 @@ def _request_PVGIS(datatype='hourly', pvtechchoice='CIS', slope=0, azimuth=0, mo
     # P_W per 1 kW peak -> {"P": {"description": "PV system power", "units": "W"} ...
     # optimalinclination	Calculate the optimum inclination angle. Value of 1 for "yes". All other values (or no value) mean "no"
     # optimalangles Calculate the optimum inclination AND orientation angles. Value of 1 for "yes". All other values (or no value) mean "no".
-    
-    if optimal_angle:
-        print('optimal_angle', optimal_angle)
-    
+
     if datatype=='hourly':
       req = f"{PVGIS_ENDPOINT}api/seriescalc?outputformat=json&pvcalculation=1&peakpower=1&mountingplace={mountingplace}"+\
             f"&lat={lat}&lon={lon}&pvtechchoice={pvtechchoice}&loss={system_loss}&angle={slope}&aspect={azimuth}"+\
-            f"&raddatabase=PVGIS-SARAH&startyear={startyear}&endyear={endyear}"
+            f"&raddatabase=PVGIS-SARAH&startyear={startyear}&endyear={endyear}"+\
+            f"&optimalinclination={1 if optimal_angle else 0}&optimalangles={1 if optimal_both else 0}"
     else:
       raise NotImplementedError(datatype)
     
@@ -92,6 +91,8 @@ class PVGIS(object):
                                  datatype=datatype,
                                  optimal_angle=optimal_angle,
                                  optimal_both=optimal_both)
+            #with open('jj.json', 'w') as f: #"H_sun"
+            #    json.dump(self.cache[request_key], f)
         else:
             if self.verbose:
                 print(f'getting cached PVGIS data, {api_parameters}')
@@ -102,6 +103,16 @@ class PVGIS(object):
                                  lat=52.373, lon=9.738, system_loss=14, 
                                  datayear=2016, datatype='hourly', name='production', 
                                  optimal_angle=False, optimal_both=False):
+        
+
+#{"inputs": {"location": {"latitude": 52.37052, "longitude": 9.73322, "elevation": 57.0}, 
+#            "meteo_data": {"radiation_db": "PVGIS-SARAH", "meteo_db": "ERA-Interim", "year_min": 2016, 
+#                           "year_max": 2016, "use_horizon": true, "horizon_db": null, "horizon_data": "DEM-calculated"}, 
+#            "mounting_system": {"fixed": {"slope": {"value": 39, "optimal": true}, "azimuth": {"value": 0, "optimal": false}, 
+#                                          "type": "building-integrated"}}, "pv_module": {"technology": "CIS", "peak_power": 1.0, 
+#                                                                                         "system_loss": 14.0}}, "outputs": {"hourly":
+           
+        
         # makes float64 timeserie with DatetimeIndex, Name: production, Length: 8784, dtype: float64
         data_json = self.get_radiation_data(slope=slope, azimuth=azimuth, 
                                             pvtech=pvtech, lat=lat, lon=lon,
@@ -109,7 +120,17 @@ class PVGIS(object):
                                             datayear=datayear, datatype=datatype,
                                             optimal_angle=optimal_angle, optimal_both=optimal_both)
         production = pd.Series({_format_datetime(i['time']) : i['P'] for i in data_json['outputs'][datatype]}, name=name)
-        info = {}
+        h_sun = np.max([i['H_sun'] for i in data_json['outputs'][datatype] if i['P'] >= 0.1])
+        #"H_sun": {"description": "Sun height", "units": "degree"}
+        #"P": {"description": "PV system power", "units": "W"}
+        
+        if optimal_angle or optimal_both:
+            slope = data_json['inputs']['mounting_system']['fixed']['slope']['value']
+        if optimal_both:
+            azimuth = data_json['inputs']['mounting_system']['fixed']['azimuth']['value']
+        info = {'slope': slope,
+                'azimuth': azimuth,
+                'h_sun': h_sun}
         return production, info
         
 if __name__ == "__main__":

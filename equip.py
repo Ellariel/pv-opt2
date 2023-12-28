@@ -115,12 +115,19 @@ def get_soultion_metrics(solution, **kwargs):
         'genossenschaft_payback_perod': get_genossenschaft_payback_perod(solution, **kwargs),
         'locations_involved': {k : v['area_used_sqm'] for k, v in solution['components']['locations'].items()}, 
         'renting_costs': get_renting_costs(solution, **kwargs),
-        'pv_equipment_used': {k : v['pv_count'] for k, v in solution['components']['equipment'].items()},
+        #'pv_equipment_used': {k : v['pv_count'] for k, v in solution['components']['equipment'].items()},
+        'pv_equipment_used': {k : {i : j for i, j in v.items() if i not in [
+                                            'uuid', 'pv_size_Wmm', 'pv_size_Hmm', 'pv_efficiency', 'type',
+                                            'pv_watt_peak', 'pv_price', 'pv_price_per_Wp', 'pv_system_loss']}
+                              for k, v in solution['components']['equipment'].items()},
         'pv_costs': get_pv_costs(solution, **kwargs),
         'baterry_units_used': {k : v['battery_count'] for k, v in solution['components']['batteries'].items()},
         'batteries_costs': get_battery_costs(solution, **kwargs),
         'total_installation_costs': get_installation_costs(solution, **kwargs),
     }
+    
+    #{'uuid': 'FuturaSun Silk Pro All Black 360W', 'type': 'CIS', 'pv_size_Wmm': 1755, 'pv_size_Hmm': 1038, 'pv_efficiency': 20.31, 'pv_watt_peak': 360, 'pv_price': 199, 'pv_price_per_Wp': 0.5527777777777778, 'pv_system_loss': 14,
+    # 'pv_count', 'slope', 'azimuth', 'h_sun', 'pv_dist'
 
 # min: building energy cost = (SEC * CP) + (SPU * SP) + roof renting costs
 # grid buying price BP: price at which the respective energy provider is buying energy per kwh
@@ -216,7 +223,10 @@ def get_energy_storage_capacity(solution, **kwargs):
     return _storage_capacity   
 
 def get_max_equipment_count_for_location(loc, eq, **kwargs):
-    return np.floor((loc['area_sqm'] - loc['area_used_sqm']) * 10 ** 6 / (eq['pv_size_Wmm'] * eq['pv_size_Hmm']))
+    loc.setdefault('pv_dist', 0)
+    #print(loc)
+    #return np.floor((loc['area_sqm'] - loc['area_used_sqm']) * 10 ** 6 / (eq['pv_size_Wmm'] * eq['pv_size_Hmm']))
+    return np.floor((loc['area_sqm'] - loc['area_used_sqm']) * 10 ** 6 / (eq['pv_size_Wmm'] * (eq['pv_size_Hmm'] + loc['pv_dist'])))
 
 def calc_equipment_allocation(solution, pvgis=None, calc_production=False, **kwargs):
     #print(solution)
@@ -228,7 +238,7 @@ def calc_equipment_allocation(solution, pvgis=None, calc_production=False, **kwa
             optimal_angle = kwargs.get('optimal_angle', False)
             optimal_both = kwargs.get('optimal_both', False)
             if loc['flat']:
-                print('flat_roof')
+                #print('flat_roof')
                 optimal_angle = True
             return pvgis.get_production_timeserie(slope=loc['slope'],
                                               azimuth=loc['azimuth'], 
@@ -242,10 +252,25 @@ def calc_equipment_allocation(solution, pvgis=None, calc_production=False, **kwa
     total_production = None
     allocation_area_used = {}
     allocation_equipment = {}
+    equipment_info = {}
     equipment = copy.deepcopy([v for k, v in solution['components']['equipment'].items()])#copy.deepcopy()#.copy()########
     locations = copy.deepcopy([v for k, v in solution['components']['locations'].items()])#)#.copy()########copy.deepcopy(
     while len(locations) and len(equipment):
-        loc, eq = locations[0], equipment[0]     
+        loc, eq = locations[0], equipment[0]  
+        
+        if calc_production:
+            production, info = get_nominal_production(eq, loc) 
+            #{'slope': 39, 'azimuth': 0, 'h_sun': 60.99}
+            #https://easysolar.app/en/ufaqs/how-to-calculate-the-minimum-distance-between-pv-panels/#:~:text=By%20transforming%2C%20h%3D%20%28L%20%2F%20sin90%29%20%2A%20sin,between%20the%20panels%3A%20D%3D%20h%20%2F%20tan%20%28Hs%29
+            #h= (L / sin90) * sin(a)
+            #D= h / tan(Hs)
+            if isinstance(production, pd.Series):
+                info['pv_dist'] = eq['pv_size_Hmm'] * np.sin(info['slope']*np.pi/180) / np.sin(90*np.pi/180) / np.tan(info['h_sun']*np.pi/180)
+                if eq['uuid'] not in equipment_info:
+                    equipment_info[eq['uuid']] = {}
+                equipment_info[eq['uuid']].update({loc['uuid'] : info.copy()})
+                loc.update({'pv_dist' : info['pv_dist']})      
+           
         max_equipment_count = get_max_equipment_count_for_location(loc, eq, **kwargs)
         if eq['pv_count'] < max_equipment_count:
                 eq_count = eq['pv_count']
@@ -271,10 +296,8 @@ def calc_equipment_allocation(solution, pvgis=None, calc_production=False, **kwa
         allocation_equipment[eq['uuid']] = allocation_equipment[eq['uuid']] + eq_count if eq['uuid'] in allocation_equipment else eq_count
         
         if calc_production:
-            production, info = get_nominal_production(eq, loc)
-            #print(production.sum())
             if isinstance(production, pd.Series):
-                production = production * (eq['pv_watt_peak'] / 1000) * eq_count    
+                production = production * (eq['pv_watt_peak'] / 1000) * eq_count         
             total_production = total_production + production if isinstance(total_production, pd.Series) else production
     solution['building']['production'] = total_production
     
@@ -293,7 +316,9 @@ def calc_equipment_allocation(solution, pvgis=None, calc_production=False, **kwa
         if k in allocation_equipment:
             v['pv_count'] = allocation_equipment[k]
         else:
-            v['pv_count'] = 0            
+            v['pv_count'] = 0   
+        if k in equipment_info:
+            v.update(equipment_info[k])       
             
     #
     #return True
@@ -303,6 +328,7 @@ def calc_equipment_allocation(solution, pvgis=None, calc_production=False, **kwa
     #if calc_production:
     #    solution.update({'after_calc_production' : True})
     check_solution_year(solution)
+    #print(solution)
     return solution
 
 def from_storage(key, storage):
