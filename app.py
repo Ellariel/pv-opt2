@@ -212,17 +212,21 @@ def api_table(table_name, format):
 #@auth.login_required
 def api_figure(source, data_type, uuid):
     #print(source, data_type, uuid)
+    id = 0
     try:
         d = pd.Series()
         if source == 'building':
             d = main.buildings[uuid][data_type]
         elif source == 'solution':
+            if data_type == 'production':
+                id = int(uuid.split('=')[0]) - 1
+                uuid = uuid[len(uuid.split('=')[0]) + 1:]
             _, s = main.load_solutions(main.data_tables['solution_data'], uuid, storage=main.solution_dir)
             if s:
                 if data_type == 'metrics':
                     d = pd.DataFrame([i['metrics'] for i in s])
                 else:
-                    d = s[0]['building'][data_type]
+                    d = s[id]['building'][data_type]
         if len(d):
             file_name = os.path.join(figures_dir, get_hash(d)+'.png')
             if not os.path.exists(file_name):
