@@ -40,6 +40,7 @@ config = {
             'optimal_both': 0,
             
             'max_investments': 250000,
+            'max_kwattpeak': 100,
             'max_payback_perod': 30,
             'min_payback_perod': 5,
             'max_equipment_count': 150,
@@ -259,7 +260,6 @@ def calculate(base_dir):
                      _print(f"{s['metrics']}")
                  data_tables['solution_data'] = save_solutions(data_tables['solution_data'], solutions, storage=solution_dir)
     save_pickle(data_tables, os.path.join(base_dir, 'components.pickle'))
-
     
 def save_solutions(solution_data, solutions, timestamp=None, uuid=None, storage='./'):
         data_key = equip.Solution.copy()
@@ -277,22 +277,6 @@ def save_solutions(solution_data, solutions, timestamp=None, uuid=None, storage=
                 data[c] = data[c].apply(lambda x: str(x))     
         to_storage(data_key['solutions_profile_key'], solutions, storage=storage)
         return pd.concat([solution_data, data], ignore_index=True)
-    
-'''
-def save_solutions(solution_data, solutions, timestamp=None, uuid=None, storage='./'):
-        data_key = equip.Solution.copy()
-        data_key['uuid'] = uuid if uuid != None else uuid4().hex
-        data_key['timestamp'] = timestamp if timestamp != None else time.time()
-        data_key['building_uuid'] = solutions[0]['building']['uuid']
-        data_key['metrics'] = str(solutions[0]['metrics'])
-        data_key['config'] = str(solutions[0]['config'])
-        data_key['solutions_profile_key'] = uuid4().hex
-        #data_key.update(solutions[0]['metrics'])
-        del data_key['components']
-        del data_key['building']
-        to_storage(data_key['solutions_profile_key'], solutions, storage=storage)
-        return pd.concat([solution_data, pd.DataFrame.from_dict({0: data_key}, orient='index')], ignore_index=True)
-'''
     
 def load_solutions(solution_data, uuid=None, timestamp=None, storage='./'):
         query = f"`uuid` == '{uuid}'"

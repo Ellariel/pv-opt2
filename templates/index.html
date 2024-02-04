@@ -154,6 +154,7 @@
                     value += '&optimal_both='+document.getElementById('optimal_both').value;
 
                     value += '&max_investments='+document.getElementById('max_investments').value;
+                    value += '&max_kwattpeak='+document.getElementById('max_kwattpeak').value;
                     value += '&max_payback_perod='+document.getElementById('max_payback_perod').value;
                     value += '&min_payback_perod='+document.getElementById('min_payback_perod').value;
                     value += '&max_equipment_count='+document.getElementById('max_equipment_count').value;
@@ -182,7 +183,8 @@
                             document.getElementById('optimal_angle').value = req.optimal_angle;
                             document.getElementById('optimal_both').value = req.optimal_both;
                             
-                            document.getElementById('max_investments').value = req.max_investments;
+                            document.getElementById('max_investments').value = req.max_investments; 
+                            document.getElementById('max_kwattpeak').value = req.max_kwattpeak;
                             document.getElementById('max_payback_perod').value = req.max_payback_perod;
                             document.getElementById('min_payback_perod').value = req.min_payback_perod;
                             document.getElementById('max_equipment_count').value = req.max_equipment_count;
@@ -352,10 +354,12 @@
                                             <td><div>optimal_angle:</td><td><input type="text" name="optimal_angle" id="optimal_angle"/><br /></div></td> 
                                         <tr>
                                             <td><div>optimal_both:</td><td><input type="text" name="optimal_both" id="optimal_both"/><br /></div></td>                                                    
-                                                    
+                                            
             
                                         <tr>
                                             <td><div>max_investments:</td><td><input type="text" name="max_investments" id="max_investments"/><br /></div></td>
+                                        <tr>
+                                            <td><div>max_kwattpeak:</td><td><input type="text" name="max_kwattpeak" id="max_kwattpeak"/><br /></div></td>
                                         <tr>
                                             <td><div>max_payback_perod:</td><td><input type="text" name="max_payback_perod" id="max_payback_perod"/><br /></div></td>
                                         <tr>

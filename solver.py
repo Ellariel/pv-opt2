@@ -153,6 +153,7 @@ class ConstraintSolver:
         self.problem.addConstraint(self.equipment_area_needed_constraint, "ABCDE")
         self.problem.addConstraint(self.battery_capacity_constraint, "ABCDE") 
         self.problem.addConstraint(self.max_investments_constraint, "ABCDE") 
+        self.problem.addConstraint(self.max_kwattpeak_constraint, "ABCDE") 
         self.problem.addConstraint(self.max_payback_perod_constraint, "ABCDE")        
 
     def max_payback_perod_constraint(self, A, B, C, D, E):
@@ -187,6 +188,15 @@ class ConstraintSolver:
         installation_costs = self.get_cached((A, B, C, D, E), 'get_installation_costs')
         #print(f"max_investments_constraint: {installation_costs} <= {self.config['max_investments']}")
         return installation_costs <= self.config['max_investments']
+    
+    #@functools.cache
+    def max_kwattpeak_constraint(self, A, B, C, D, E):
+        solution = self.get_cached((A, B, C, D, E), 'calc_equipment_allocation')
+        total_kwattpeak = 0
+        for eq in solution['components']['equipment'].values():
+            total_kwattpeak += eq['pv_watt_peak'] * eq['pv_count'] / 1000
+        #print(f"max_kwattpeak_constraint: {total_kwattpeak} <= {self.config['max_kwattpeak']}")
+        return total_kwattpeak <= self.config['max_kwattpeak']
     
     #@functools.cache
     def build_solution(self, items): # A, B, C, D, E

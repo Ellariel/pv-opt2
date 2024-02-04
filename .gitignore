@@ -1,5 +1,6 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
+__pycache__
 *.py[cod]
 *$py.class
 
@@ -42,6 +43,8 @@ cache.pickle
 *.faas
 *.old
 *.bak
+solution/
+figures/
 
 # Installer logs
 pip-log.txt
