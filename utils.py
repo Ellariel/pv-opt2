@@ -1,13 +1,38 @@
-import json, time, requests, uuid, os, datetime, jsonpickle, pickle, shutil, glob
-import pandas as pd#, numpy as np
+import json, time, requests, uuid, os, jsonpickle, pickle, shutil, glob
+import pandas as pd, numpy as np
 from pandas import json_normalize
 import matplotlib.pyplot as plt
 import matplotlib.ticker as plticker
 import hashlib
 import cv2
 import base64
+import datetime
+import calendar
 from faas_cache_dict.file_faas_cache_dict import FileBackedFaaSCache
 
+def rescale(data):
+    if str(data.index.freq) != '<Day>': # rescaling to daily-based datetimeindex
+        return data.fillna(0).resample('D').sum()
+    return data
+
+def rescale_monthly_profile(monthly_data, weekends=False):
+    if weekends:
+        data = pd.DataFrame()
+        for idx, item in monthly_data.resample('M'):
+            month = str(idx.month).zfill(2)
+            new_index = pd.date_range(f'{idx.year}-{month}-01', f'{idx.year}-{month}-{calendar.monthrange(idx.year, int(month))[1]}', freq='D')
+            new_data = np.asarray([2.288151835 if datetime.datetime.weekday(i) < 5 else 1 for i in new_index])
+            new_data = new_data * (item.sum() / sum(new_data))
+            data = pd.concat([data, pd.concat([pd.Series(new_index), pd.Series(new_data)], axis=1)], ignore_index=True)
+        return data.set_index(0).iloc[:,0].fillna(0).resample('D').sum()
+    else:
+        old_index = monthly_data.index.copy()
+        if str(old_index.freq) != '<Day>':
+            data = monthly_data.fillna(0).resample('D').sum()
+            new_index = sorted(data.index.get_indexer(old_index, method='ffill'))
+            for i in range(0, len(new_index) - 1):
+                data.iloc[new_index[i]:new_index[i+1]] = data.iloc[new_index[i]:new_index[i+1]].mean()
+        return data
 
 
 class SyncronizedCache(FileBackedFaaSCache):

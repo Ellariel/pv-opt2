@@ -162,35 +162,30 @@ def get_genossenschaft_payback_perod(solution, discount_rate=0.03, discount_hori
 
 # solar energy consumption SEC = min{building solar production, building consumption}
 def get_solar_energy_consumption(solution, **kwargs):
-    #return min(solution['building']['production'].sum(), solution['building']['consumption'].sum())
-    result = np.minimum(solution['building']['consumption'].fillna(0).resample('D').sum(),
-                        solution['building']['production'].fillna(0).resample('D').sum())
+    result = np.minimum(solution['building']['consumption'], solution['building']['production'])#.fillna(0).resample('D').sum())
     return result.sum()
 
 # solar panel underproduction SPU = max{0, (building consumption - building solar production)}
 def get_solar_energy_underproduction(solution, **kwargs):
     #return max(0, solution['building']['consumption'].sum() - solution['building']['production'].sum())
-    diff = solution['building']['consumption'].fillna(0).resample('D').sum() -\
-           solution['building']['production'].fillna(0).resample('D').sum()
+    diff = solution['building']['consumption'] - solution['building']['production']#.fillna(0).resample('D').sum()
     diff = np.where(diff < 0, 0, diff)
     return diff.sum()
        
 # solar panel overproduction SPO = max{0, (building solar production - building consumption)}
 def get_solar_energy_overproduction(solution, **kwargs):
-    #return max(0, solution['building']['production'].sum() - solution['building']['consumption'].sum())
-    diff = solution['building']['production'].fillna(0).resample('D').sum() -\
-           solution['building']['consumption'].fillna(0).resample('D').sum()
+    diff = solution['building']['production'] - solution['building']['consumption']#.fillna(0).resample('D').sum()
     diff = np.where(diff < 0, 0, diff)
     return diff.sum()
 
 def get_energy_storage_needed(solution, autonomy_period_days=-1, **kwargs):
     if autonomy_period_days == 0:
         return 0
-    peak_daily_consumption = solution['building']['consumption'].resample('D').sum().max()
+    peak_daily_consumption = solution['building']['consumption'].max() #.resample('D').sum()
     if autonomy_period_days < 0:
         #if not isinstance(solution['building']['production'], pd.Series):
         #    return np.nan
-        avg_daily_production = solution['building']['production'].resample('D').sum().mean()
+        avg_daily_production = solution['building']['production'].mean() #.resample('D').sum()
         autonomy_period_days = np.ceil(peak_daily_consumption / avg_daily_production)
     return peak_daily_consumption * autonomy_period_days
 
@@ -299,7 +294,7 @@ def calc_equipment_allocation(solution, pvgis=None, calc_production=False, **kwa
             if isinstance(production, pd.Series):
                 production = production * (eq['pv_watt_peak'] / 1000) * eq_count         
             total_production = total_production + production if isinstance(total_production, pd.Series) else production
-    solution['building']['production'] = total_production
+    solution['building']['production'] = utils.rescale(total_production)
     
     #solution['components']['locations'] = copy.deepcopy(solution['components']['locations'])
     
@@ -334,7 +329,7 @@ def calc_equipment_allocation(solution, pvgis=None, calc_production=False, **kwa
 def from_storage(key, storage):
     file_name = os.path.join(storage, key) + '.csv'
     if os.path.exists(file_name):
-        return pd.read_csv(file_name, parse_dates=True, header=None, index_col=0).iloc[:,0]
+        return utils.rescale(pd.read_csv(file_name, parse_dates=True, header=None, index_col=0).iloc[:,0])
       
 def to_storage(key, data, storage):
     file_name = os.path.join(storage, key) + '.csv'
