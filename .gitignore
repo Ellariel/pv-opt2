@@ -41,6 +41,7 @@ instance
 cache.pickle
 *.zip
 *.faas
+*.faas.old
 *.old
 *.bak
 solution/

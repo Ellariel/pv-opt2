@@ -31,6 +31,7 @@ CACHED_CONGIF_KEYS = {
             'optimal_both': True,
             
             'max_investments': False,
+            'max_kwattpeak': False,
             'max_payback_perod': False,
             'max_equipment_count': False,
             'min_equipment_count': False, 

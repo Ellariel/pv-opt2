@@ -294,7 +294,7 @@ def calc_equipment_allocation(solution, pvgis=None, calc_production=False, **kwa
             if isinstance(production, pd.Series):
                 production = production * (eq['pv_watt_peak'] / 1000) * eq_count         
             total_production = total_production + production if isinstance(total_production, pd.Series) else production
-    solution['building']['production'] = utils.rescale(total_production)
+    solution['building']['production'] = utils.rescale(total_production) if isinstance(total_production, pd.Series) else None
     
     #solution['components']['locations'] = copy.deepcopy(solution['components']['locations'])
     
