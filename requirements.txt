@@ -8,10 +8,9 @@ matplotlib==3.8.0
 numpy==1.26.1
 opencv_python==4.8.1.78
 pandas==2.1.2
-pvutils==1.0
 python-constraint==1.4.0
 ray==2.7.1
 Requests==2.31.0
 tqdm==4.66.1
 Werkzeug==3.0.1
-pvutils @ git+https://github.com/ellariel/pvutils.git
+openpyxl
