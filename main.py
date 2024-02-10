@@ -159,7 +159,7 @@ def calculate(base_dir):
     start_time = time.time()
     
     if not config['use_ray']:
-        pvgis = PVGIS(verbose=True)
+        pvgis = PVGIS(verbose=True, local_cache_dir=False)
         for uuid, b in buildings.items():
             results[uuid] = []
             print(f"solving building: {uuid}")
@@ -205,14 +205,16 @@ def calculate(base_dir):
             solutions = []
             try:
                 print(f"solving building: {building['uuid']}")
-                pvgis = PVGIS(verbose=True)
+                pvgis = PVGIS(verbose=True, local_cache_dir=False)
                 _start_time = time.time()
                 solver = ConstraintSolver(building, components, pvgis, config=config)
                 solutions = solver.get_solutions()  
                 del solver 
                 print(f"{building['uuid']} solving time: {format_timespan(time.time() - _start_time)}")
-            except Exception as e:
-                print(f"some errors occured while calculating building {building['uuid']}: {str(e)}")
+            finally:
+                pass  
+            #except Exception as e:
+            #    print(f"some errors occured while calculating building {building['uuid']}: {str(e)}")
             return solutions 
 
         if config['autonomy_period_days'] == 0:
