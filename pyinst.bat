@@ -1,4 +1,4 @@
-pyinstaller gui.py --noconfirm --console --hidden-import "msgpack" --hidden-import "setproctitle" --hidden-import "ray._private.memory_monitor" --additional-hooks-dir=hooks --add-data="./templates;./templates" --add-data="./static;./static"
+pyinstaller gui.py --noconfirm --console --hidden-import "msgpack" --hidden-import "tqdm" --hidden-import "setproctitle" --hidden-import "ray._private.memory_monitor" --additional-hooks-dir=hooks --add-data="./templates;./templates" --add-data="./static;./static"
 xcopy consumption dist\gui\consumption /i /e /y
 xcopy production dist\gui\production /i /e /y
 xcopy solution dist\gui\solution /i /e /y
