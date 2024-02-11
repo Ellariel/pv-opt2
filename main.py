@@ -20,7 +20,7 @@ from concurrent.futures import ProcessPoolExecutor
 import equip
 #from equip import Building, Equipment, Location, Battery
 from utils import save_pickle, load_pickle, move_files, from_storage, to_storage, is_empty
-from solver import ConstraintSolver#, total_building_energy_costs, total_installation_costs, genossenschaft_profit, _update_building
+from solver1 import ConstraintSolver#, total_building_energy_costs, total_installation_costs, genossenschaft_profit, _update_building
 
 #from pvutils import PVGIS
 from pvgis import PVGIS
@@ -114,7 +114,8 @@ def init_components(base_dir, upload_dir=None):
                     data_tables[k].index = data_tables[k].uuid.copy()
                     
                     if 'battery_price' in data_tables[k].columns:
-                        data_tables[k]['battery_price_per_kWh'] = (data_tables[k]['battery_price'] / data_tables[k]['battery_energy_kWh']).fillna(0)
+                        data_tables[k]['battery_effective_energy_kWh'] = (data_tables[k]['battery_energy_kWh'] * data_tables[k]['battery_discharge_factor']).fillna(0)
+                        data_tables[k]['battery_price_per_kWh'] = (data_tables[k]['battery_price'] / data_tables[k]['battery_effective_energy_kWh']).fillna(0)
                         #data_tables[k].loc[pd.isna(data_tables[k]['battery_energy_kWh']), ['battery_price_per_kWh']] = 0
                         #print(data_tables[k]['battery_price_per_kWh'])
                         
@@ -159,7 +160,7 @@ def calculate(base_dir):
     start_time = time.time()
     
     if not config['use_ray']:
-        pvgis = PVGIS(verbose=True, local_cache_dir=False)
+        pvgis = PVGIS(verbose=True)#, local_cache_dir=False)
         for uuid, b in buildings.items():
             results[uuid] = []
             print(f"solving building: {uuid}")
@@ -254,13 +255,13 @@ def calculate(base_dir):
                  _print(f"top solutions for building {uuid}:")
                  
                  #ray_results[uuid] = sorted(ray_results[uuid], reverse=True, key=lambda x: x['genossenschaft_value'])
-                 results[uuid] = sorted(results[uuid], reverse=False, key=lambda x: x['solution_energy_costs'])
+                 #results[uuid] = sorted(results[uuid], reverse=False, key=lambda x: x['solution_energy_costs'])
                  
-                 solutions = results[uuid][:config['shown_solutions_limit']]
-                 for s in solutions:
-                     s.update({'metrics' : equip.get_soultion_metrics(s), 'config' : config})
+                 #solutions = results[uuid][:config['shown_solutions_limit']]
+                 for s in results[uuid]:
+                     s['metrics']['solution'] = str(s['metrics']['solution'])
                      _print(f"{s['metrics']}")
-                 data_tables['solution_data'] = save_solutions(data_tables['solution_data'], solutions, storage=solution_dir)
+                 data_tables['solution_data'] = save_solutions(data_tables['solution_data'], results[uuid], storage=solution_dir)
     save_pickle(data_tables, os.path.join(base_dir, 'components.pickle'))
     
 def save_solutions(solution_data, solutions, timestamp=None, uuid=None, storage='./'):
@@ -269,6 +270,7 @@ def save_solutions(solution_data, solutions, timestamp=None, uuid=None, storage=
         data_key['timestamp'] = timestamp if timestamp != None else time.time()
         data_key['solutions_profile_key'] = uuid4().hex
         data_key['config'] = str(solutions[0]['config'])
+        data_key['building_uuid'] = str(solutions[0]['building']['uuid'])
         del data_key['components']
         del data_key['building']
         del data_key['metrics']

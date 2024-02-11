@@ -91,7 +91,7 @@ Solution = dict(
         uuid = None,
         timestamp = 1692989661.8293242,
         building = None,
-        #selected = 0,
+        #solution = None,
         metrics = None,
         solutions_profile_key = '5c75deb8d33045cd86bb3ee9b7e98c25',
         components = dict(
@@ -223,27 +223,116 @@ def get_max_equipment_count_for_location(loc, eq, **kwargs):
     #return np.floor((loc['area_sqm'] - loc['area_used_sqm']) * 10 ** 6 / (eq['pv_size_Wmm'] * eq['pv_size_Hmm']))
     return np.floor((loc['area_sqm'] - loc['area_used_sqm']) * 10 ** 6 / (eq['pv_size_Wmm'] * (eq['pv_size_Hmm'] + loc['pv_dist'])))
 
-def calc_equipment_allocation(solution, pvgis=None, calc_production=False, **kwargs):
+
+
+
+
+
+# min: building energy cost = (SEC * CP) + (SPU * SP) + roof renting costs
+# grid buying price BP: price at which the respective energy provider is buying energy per kwh
+# grid selling price SP: price at which the respective energy provider is selling energy per kwh
+# city price CP: price at which the Genossenschaft is selling energy to the city # city_selling_price
+
+# max: Genossenschaft profit = (SPO * BP) + (SEC * CP) – IC - roof renting costs   
+# grid buying price BP: price at which the respective energy provider is buying energy per kwh
+# city price CP: price at which the Genossenschaft is selling energy to the city # city_selling_price 
+
+def _get_genossenschaft_payback_perod(genossenschaft_value, installation_costs, **kwargs):
+    discount_horison = kwargs.get('discount_horison', 5)
+    discount_rate = kwargs.get('discount_rate', 0.03)
+    payback_period = int(max(1, np.ceil(installation_costs / genossenschaft_value))) + discount_horison
+    npv = 0
+    for i in range(1, payback_period):
+        npv += genossenschaft_value / (1 + discount_rate) ** i
+        if npv + 1 > installation_costs:
+            return i
+    return f'>{payback_period}'
+
+def adjust_year(production, consumption):
+    if isinstance(production, pd.Series) and isinstance(consumption, pd.Series):
+        production_year = production.index[0].year
+        consumtion_year = consumption.index[0].year
+        diff = consumtion_year - production_year
+        if diff != 0:
+            production.index = production.index + pd.offsets.DateOffset(years=diff)
+        return diff
+
+# solar energy consumption SEC = min{building solar production, building consumption}
+def _get_solar_energy_consumption(production, consumption, **kwargs):
+    result = np.minimum(consumption, production)
+    return result#.sum()
+
+# solar panel underproduction SPU = max{0, (building consumption - building solar production)}
+def _get_solar_energy_underproduction(production, consumption, **kwargs):
+    diff = consumption - production
+    diff = np.where(diff < 0, 0, diff)
+    return diff#.sum()
+       
+# solar panel overproduction SPO = max{0, (building solar production - building consumption)}
+def _get_solar_energy_overproduction(production, consumption, **kwargs):
+    diff = production - consumption
+    diff = np.where(diff < 0, 0, diff)
+    return diff#.sum()
+
+#def _get_capacity_needed(energy_overproduction, energy_underproduction, **kwargs):
+#    diff = production - consumption
+#    diff = np.where(diff < 0, 0, diff)
+#    return diff
+
+def _get_renting_costs(loc, eq, **kwargs):
+    eq.setdefault('pv_dist', 0)
+    area_used_sqm = eq['pv_size_Wmm'] * (eq['pv_size_Hmm'] + eq['pv_dist']) * eq['pv_count'] / (10 ** 6)
+    return area_used_sqm * loc['price_per_sqm']
+
+def _get_installation_costs(loc, eq, **kwargs):
+    eq.setdefault('pv_count', 1)
+    eq_costs = eq['pv_watt_peak'] *\
+                eq['pv_price_per_Wp'] *\
+                eq['pv_count'] *\
+                (kwargs.get('installation_coef', 1) + kwargs.get('miscellaneous_coef', 0.5) + 1)
+                # + get_battery_costs(solution, **kwargs)
+    rent_costs = _get_renting_costs(loc, eq)
+    return eq_costs + rent_costs
+
+def _get_battery_installation_costs(bt, **kwargs):
+    bt.setdefault('battery_count', 1)
+    bt_costs = bt['battery_price'] *\
+               bt['battery_count'] *\
+               (kwargs.get('installation_coef', 1) + kwargs.get('miscellaneous_coef', 0.5) + 1)
+    return bt_costs
+
+def _get_max_equipment_count_for_location(loc, eq, **kwargs):
+    eq.setdefault('pv_dist', 0)
+    return np.floor((loc['area_sqm'] - loc['area_used_sqm']) * 10 ** 6 / (eq['pv_size_Wmm'] * (eq['pv_size_Hmm'] + eq['pv_dist'])))
+
+def _get_nominal_production(loc, eq, **kwargs): # Watt per 1 kWp
+        pvgis = kwargs.get('pvgis', False)
+        if pvgis:
+            production, info = pvgis.get_production_timeserie(slope=loc['slope'],
+                                              azimuth=loc['azimuth'], 
+                                              pvtech=eq['type'], 
+                                              system_loss=eq['pv_system_loss'], 
+                                              lat=kwargs.get('lat', 52.373), 
+                                              lon=kwargs.get('lon', 9.738),
+                                              optimal_angle=loc['flat'] or kwargs.get('optimal_angle', False),
+                                              optimal_both=kwargs.get('optimal_both', False),
+                                              )  
+            info['pv_dist'] = eq['pv_size_Hmm'] * np.sin(info['slope']*np.pi/180) / np.sin(90*np.pi/180) / np.tan(info['h_sun']*np.pi/180)
+            return production, info
+        return None, {}
+                
+
+
+
+
+
+
+def calc_equipment_allocation(solution, calc_production=False, **kwargs):
     #print(solution)
     #solution = copy.deepcopy(solution)
 
     
-    def get_nominal_production(eq, loc): # Watt per 1 kWp
-        if pvgis:
-            optimal_angle = kwargs.get('optimal_angle', False)
-            optimal_both = kwargs.get('optimal_both', False)
-            if loc['flat']:
-                #print('flat_roof')
-                optimal_angle = True
-            return pvgis.get_production_timeserie(slope=loc['slope'],
-                                              azimuth=loc['azimuth'], 
-                                              pvtech=eq['type'], 
-                                              system_loss=eq['pv_system_loss'], 
-                                              lat=solution['building']['lat'], 
-                                              lon=solution['building']['lon'],
-                                              optimal_angle=optimal_angle,
-                                              optimal_both=optimal_both,
-                                              )    
+  
     total_production = None
     allocation_area_used = {}
     allocation_equipment = {}

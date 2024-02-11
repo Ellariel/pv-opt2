@@ -37,6 +37,7 @@ dist
 gui.build
 gui.dist
 hooks
+*.lock
 instance
 cache.pickle
 *.zip
