@@ -441,7 +441,7 @@ class ConstraintSolver:
                     #print(battery_capacity_limits)
                     if battery_capacity_limits.sum() > 1:    
                         for capacity in set(battery_capacity_limits):
-                            if capacity <= 0:
+                            if capacity <= 1:
                                 continue
                             _solution = copy.deepcopy(solution)
                             battery_capacity_budget = capacity / 1000
