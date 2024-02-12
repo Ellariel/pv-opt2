@@ -438,8 +438,8 @@ class ConstraintSolver:
                                                         utils.percentile(solar_energy_underproduction))
                     battery_capacity_limits = np.clip(battery_capacity_limits, 0, self.config['battery_capacity_uplimit'] * 1000)
                     
-                    print(battery_capacity_limits)
-                    if battery_capacity_limits.sum() > 0:    
+                    #print(battery_capacity_limits)
+                    if battery_capacity_limits.sum() > 1:    
                         for capacity in set(battery_capacity_limits):
                             if capacity <= 0:
                                 continue
