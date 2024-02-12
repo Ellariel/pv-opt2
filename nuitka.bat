@@ -1,4 +1,4 @@
-python -m nuitka gui.py --standalone --include-package=openpyxl,msgpack,ray,setproctitle --nofollow-import-to=IPython
+python -m nuitka gui.py --standalone --include-package=openpyxl,tqdm,msgpack,ray,setproctitle --nofollow-import-to=IPython
 xcopy consumption gui.dist\consumption /i /e /y
 xcopy production gui.dist\production /i /e /y
 xcopy solution gui.dist\solution /i /e /y

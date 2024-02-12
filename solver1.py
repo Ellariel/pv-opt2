@@ -299,9 +299,7 @@ class ConstraintSolver:
         #    print(self.cache[calc_key][0])
         return self.cache[calc_key]#[0]  
     
-    
-    
-    def get_initial_solutions(self):
+    def get_initial_solutions(self):        
         self.initial_solutions = []
         for loc_idx, loc in tqdm(self.filtered_locations.items()):
             _list = []
@@ -336,151 +334,166 @@ class ConstraintSolver:
         grid_selling_price = self.config.get('grid_selling_price', 0.30) 
         grid_buying_price = self.config.get('grid_buying_price', 0.08)
         
-        for i in tqdm(list(range(self.config['shown_solutions_limit']))):
-            _solutions = []
-            investments_budget = self.config['max_investments']
-            kwattpeak_budget = self.config['max_kwattpeak']
-            for loc_idx, _list in copy.deepcopy(self.initial_solutions):
-                
-                if i >= len(_list):
-                    break
-                
-                for loc, eq, production, installation_costs, _ in _list[i:]:
-                        kwattpeak_installed = eq['pv_watt_peak'] / 1000
-                        pv_count = min([equip._get_max_equipment_count_for_location(loc, eq, 
-                                                                                        **self.config),
-                                            np.floor(investments_budget / installation_costs),
-                                            np.floor(kwattpeak_budget / kwattpeak_installed),
-                        ])
-                        area_used_sqm = eq['pv_size_Wmm'] * (eq['pv_size_Hmm'] + eq['pv_dist']) * pv_count / (10 ** 6)
+        for i in tqdm(list(range(self.config['shown_solutions_limit']))): # split equipment
+            for j in tqdm(list(range(self.config['shown_solutions_limit']))): # split locations
 
-                        if (pv_count <= 0) or (loc['area_used_sqm'] + area_used_sqm > loc['area_sqm']):
+                if j >= len(self.initial_solutions):
+                    break
+
+                _solutions = []
+                investments_budget = self.config['max_investments']
+                kwattpeak_budget = self.config['max_kwattpeak']
+                for loc_idx, _list in copy.deepcopy(self.initial_solutions[j:]):
+                    
+                    if i >= len(_list):
+                        break
+                    
+                    for loc, eq, production, installation_costs, _ in _list[i:]:
+                            kwattpeak_installed = eq['pv_watt_peak'] / 1000
+                            pv_count = min([equip._get_max_equipment_count_for_location(loc, eq, 
+                                                                                            **self.config),
+                                                np.floor(investments_budget / installation_costs),
+                                                np.floor(kwattpeak_budget / kwattpeak_installed),
+                                                self.config['max_equipment_count'],
+                            ])
+                            area_used_sqm = eq['pv_size_Wmm'] * (eq['pv_size_Hmm'] + eq['pv_dist']) * pv_count / (10 ** 6)
+
+                            if (pv_count <= 0) or (loc['area_used_sqm'] + area_used_sqm > loc['area_sqm']):
+                                break
+                            
+                            eq['pv_count'] = pv_count
+                            loc['area_used_sqm'] += area_used_sqm
+                            investments_budget -= installation_costs * pv_count
+                            kwattpeak_budget -= kwattpeak_installed * pv_count
+                            _solutions.append((loc, eq, production * pv_count, installation_costs * pv_count))
+                        
+                    if (investments_budget <= 0) or (kwattpeak_budget <= 0):
                             break
                         
-                        eq['pv_count'] = pv_count
-                        loc['area_used_sqm'] += area_used_sqm
-                        investments_budget -= installation_costs * pv_count
-                        kwattpeak_budget -= kwattpeak_installed * pv_count
-                        _solutions.append((loc, eq, production * pv_count, installation_costs * pv_count))
+                if len(_solutions):
+                    components = []
+                    total_production = 0    
+                    total_renting_costs = 0
+                    total_installation_costs = 0       
+                    total_consumption = self.building['consumption'].fillna(0)    
+                    for loc, eq, production, installation_costs in _solutions:
+                        components.append((loc, eq))
+                        total_production += production
+                        total_installation_costs += installation_costs
+                        total_renting_costs += equip._get_renting_costs(loc, eq, **self.config)
+                        
+                    total_production = utils.rescale(total_production)
+                    equip.adjust_year(total_production, total_consumption)
                     
-                if (investments_budget <= 0) or (kwattpeak_budget <= 0):
-                        break
+                    _building = copy.deepcopy(self.building)
+                    _building['production'] = total_production
                     
-            if len(_solutions):
-                components = []
-                total_production = 0    
-                total_renting_costs = 0
-                total_installation_costs = 0       
-                total_consumption = self.building['consumption'].fillna(0)    
-                for loc, eq, production, installation_costs in _solutions:
-                    components.append((loc, eq))
-                    total_production += production
-                    total_installation_costs += installation_costs
-                    total_renting_costs += equip._get_renting_costs(loc, eq, **self.config)
-                    
-                total_production = utils.rescale(total_production)
-                equip.adjust_year(total_production, total_consumption)
-                
-                _building = copy.deepcopy(self.building)
-                _building['production'] = total_production
-                
-                solar_energy_consumption = equip._get_solar_energy_consumption(total_production, 
-                                                                                    total_consumption,
-                                                                                    **self.config)
-                solar_energy_underproduction = equip._get_solar_energy_underproduction(total_production, 
+                    solar_energy_consumption = equip._get_solar_energy_consumption(total_production, 
+                                                                                        total_consumption,
+                                                                                        **self.config)
+                    solar_energy_underproduction = equip._get_solar_energy_underproduction(total_production, 
+                                                                                                total_consumption,
+                                                                                                **self.config)
+                    solar_energy_overproduction = equip._get_solar_energy_overproduction(total_production, 
                                                                                             total_consumption,
-                                                                                            **self.config)
-                solar_energy_overproduction = equip._get_solar_energy_overproduction(total_production, 
-                                                                                          total_consumption,
-                                                                                          **self.config)                
-                solution_energy_costs = solar_energy_consumption.sum() / 1000  * city_selling_price +\
-                                        solar_energy_underproduction.sum() / 1000 * grid_selling_price  
-                                             
-                alternative_energy_costs = total_consumption.sum() / 1000 * grid_selling_price
-                
-                genossenschaft_value = solar_energy_overproduction.sum() / 1000 * grid_buying_price +\
-                                       solar_energy_consumption.sum() / 1000 * city_selling_price -\
-                                       total_renting_costs
-                
-                battery_capacity_limit = min([solar_energy_overproduction.mean(), 
-                                               solar_energy_underproduction.mean()])
-                solution = {
-                    'building_uuid': self.building['uuid'],
-                    'building': _building,
-                    'equpment': components,
-                    'config': self.config,
-                    'batteries' : [],
-                    'metrics': {
-                        'total_production': total_production.sum(),
-                        'total_consumption': total_consumption.sum(),
-                        'solar_energy_consumption': solar_energy_consumption.sum(),
-                        'solar_energy_underproduction': solar_energy_underproduction.sum(),
-                        'solar_energy_overproduction': solar_energy_overproduction.sum(),
-                        'battery_capacity_limit': battery_capacity_limit,
-                        'total_installation_costs': total_installation_costs,
-                        'total_renting_costs': total_renting_costs,
-                        'solution_energy_costs': solution_energy_costs,
-                        'alternative_energy_costs': alternative_energy_costs,
-                        'genossenschaft_value': genossenschaft_value,
-                        'genossenschaft_payback_perod': equip._get_genossenschaft_payback_perod(genossenschaft_value, 
-                                                                                             total_installation_costs),
-                        'solution' : [{'location' : loc['uuid'],
-                                       'equipment' : eq['uuid'],
-                                       'equipment_count' : eq['pv_count']} for loc, eq in components]
-                        }
-                }               
-                self.solutions.append(copy.deepcopy(solution))
-                
-                battery_capacity_budget = battery_capacity_limit / 1000
-                investments_budget = self.config['max_investments'] - total_installation_costs
-                
-                batteries = []
-                for bt in self.filtered_batteries[:self.config['shown_solutions_limit']]:
-                    _bt = bt.copy()
-                    _bt['battery_count'] = 1
-                    battery_installation_costs = equip._get_battery_installation_costs(_bt)
-                    bt_count = min([np.floor(battery_capacity_budget / _bt['battery_effective_energy_kWh']),
-                                    np.floor(investments_budget / battery_installation_costs)
-                                    ])
-                    _bt['battery_count'] = bt_count
-                    if (bt_count > 0):
-                        batteries.append(_bt)
-                    battery_capacity_budget -= _bt['battery_effective_energy_kWh'] * bt_count
-                    investments_budget -= battery_installation_costs * bt_count
+                                                                                            **self.config)                
+                    solution_energy_costs = solar_energy_consumption.sum() / 1000  * city_selling_price +\
+                                            solar_energy_underproduction.sum() / 1000 * grid_selling_price  
+                                                
+                    alternative_energy_costs = total_consumption.sum() / 1000 * grid_selling_price
                     
-                    if (battery_capacity_budget <= 0) or (investments_budget <= 0):
-                        break
-                
-                if len(batteries):
-                    solution['batteries'] = batteries
-                    total_battery_capacity = 0
-                    total_battery_costs = 0
-                    for bt in batteries:
-                        total_battery_capacity += bt['battery_count'] * bt['battery_effective_energy_kWh'] * 1000
-                        total_battery_costs += equip._get_battery_installation_costs(bt)
+                    genossenschaft_value = solar_energy_overproduction.sum() / 1000 * grid_buying_price +\
+                                        solar_energy_consumption.sum() / 1000 * city_selling_price -\
+                                        total_renting_costs
                     
-                    stored_overproduction = np.clip(solar_energy_overproduction, 0, total_battery_capacity).sum()
-                    stored_overproduction = min([solar_energy_underproduction.sum(), stored_overproduction, total_consumption.sum() - solar_energy_consumption.sum()])  
-                    if stored_overproduction > 0:                
-                        _solar_energy_overproduction = solar_energy_overproduction.sum() - stored_overproduction
-                        _solar_energy_underproduction = solar_energy_underproduction.sum() - stored_overproduction
-                        _solution_energy_costs = (solar_energy_consumption.sum() + stored_overproduction) / 1000  * city_selling_price +\
-                                            _solar_energy_underproduction / 1000 * grid_selling_price  
-                        _genossenschaft_value = _solar_energy_overproduction / 1000 * grid_buying_price +\
-                                        (solar_energy_consumption.sum() + stored_overproduction) / 1000 * city_selling_price -\
-                                        total_renting_costs                
-                        solution['metrics']['solar_energy_consumption'] = solar_energy_consumption.sum() + stored_overproduction      
-                        solution['metrics']['solar_energy_underproduction'] = _solar_energy_underproduction
-                        solution['metrics']['solar_energy_overproduction'] = _solar_energy_overproduction
-                        solution['metrics']['total_installation_costs'] += total_battery_costs 
-                        solution['metrics']['total_battery_capacity'] = total_battery_capacity
-                        solution['metrics']['solution_energy_costs'] = _solution_energy_costs
-                        solution['metrics']['genossenschaft_value'] = _genossenschaft_value
-                        solution['metrics']['genossenschaft_payback_perod'] = equip._get_genossenschaft_payback_perod(_genossenschaft_value, 
-                                                                                                                    solution['metrics']['total_installation_costs'])
-                        solution['metrics']['solution'] += [str({'battery' : bt['uuid'],
-                                                            'battery_count' : bt['battery_count']}) for bt in batteries],
-                        self.solutions.append(copy.deepcopy(solution))
+                    solution = {
+                        'building_uuid': self.building['uuid'],
+                        'building': _building,
+                        'equpment': components,
+                        'config': self.config,
+                        'batteries' : [],
+                        'metrics': {
+                            'total_production': total_production.sum(),
+                            'total_consumption': total_consumption.sum(),
+                            'solar_energy_consumption': solar_energy_consumption.sum(),
+                            'solar_energy_underproduction': solar_energy_underproduction.sum(),
+                            'solar_energy_overproduction': solar_energy_overproduction.sum(),
+                            #'battery_capacity_limit': battery_capacity_limit,
+                            'total_installation_costs': total_installation_costs,
+                            'total_renting_costs': total_renting_costs,
+                            'solution_energy_costs': solution_energy_costs,
+                            'alternative_energy_costs': alternative_energy_costs,
+                            'genossenschaft_value': genossenschaft_value,
+                            'genossenschaft_payback_perod': equip._get_genossenschaft_payback_perod(genossenschaft_value, 
+                                                                                                total_installation_costs),
+                            'solution' : [{'location' : loc['uuid'],
+                                        'equipment' : eq['uuid'],
+                                        'equipment_count' : eq['pv_count']} for loc, eq in components]
+                            }
+                    }               
+                    self.solutions.append(copy.deepcopy(solution))
+                    
+                    consumption_delta = total_consumption.sum() - solar_energy_consumption.sum()
+                    battery_capacity_limits = np.minimum(utils.percentile(solar_energy_overproduction), 
+                                                        utils.percentile(solar_energy_underproduction))
+                    battery_capacity_limits = np.clip(battery_capacity_limits, 0, self.config['battery_capacity_uplimit'] * 1000)
+                    
+                    print(battery_capacity_limits)
+                    if battery_capacity_limits.sum() > 0:    
+                        for capacity in set(battery_capacity_limits):
+                            if capacity <= 0:
+                                continue
+                            _solution = copy.deepcopy(solution)
+                            battery_capacity_budget = capacity / 1000
+                            investments_budget = self.config['max_investments'] - total_installation_costs
+                        
+                            batteries = []
+                            for bt in self.filtered_batteries[:self.config['shown_solutions_limit']]:
+                                _bt = bt.copy()
+                                _bt['battery_count'] = 1
+                                battery_installation_costs = equip._get_battery_installation_costs(_bt)
+                                bt_count = min([np.floor(battery_capacity_budget / _bt['battery_effective_energy_kWh']),
+                                                np.floor(investments_budget / battery_installation_costs)
+                                                ])
+                                _bt['battery_count'] = bt_count
+                                if (bt_count > 0):
+                                    batteries.append(_bt)
+                                battery_capacity_budget -= _bt['battery_effective_energy_kWh'] * bt_count
+                                investments_budget -= battery_installation_costs * bt_count
+                                
+                                if (battery_capacity_budget <= 0) or (investments_budget <= 0):
+                                    break
+                        
+                            if len(batteries):
+                                _solution['batteries'] = batteries
+                                total_battery_capacity = 0
+                                total_battery_costs = 0
+                                for bt in batteries:
+                                    total_battery_capacity += bt['battery_count'] * bt['battery_effective_energy_kWh'] * 1000
+                                    total_battery_costs += equip._get_battery_installation_costs(bt)
+                                
+                                stored_overproduction = np.clip(solar_energy_overproduction, 0, total_battery_capacity).sum()
+                                stored_overproduction = min([solar_energy_underproduction.sum(), stored_overproduction, consumption_delta])  
+                                if stored_overproduction > 0:                
+                                    _solar_energy_overproduction = solar_energy_overproduction.sum() - stored_overproduction
+                                    _solar_energy_underproduction = solar_energy_underproduction.sum() - stored_overproduction
+                                    _solution_energy_costs = (solar_energy_consumption.sum() + stored_overproduction) / 1000  * city_selling_price +\
+                                                        _solar_energy_underproduction / 1000 * grid_selling_price  
+                                    _genossenschaft_value = _solar_energy_overproduction / 1000 * grid_buying_price +\
+                                                    (solar_energy_consumption.sum() + stored_overproduction) / 1000 * city_selling_price -\
+                                                    total_renting_costs                
+                                    _solution['metrics']['solar_energy_consumption'] = solar_energy_consumption.sum() + stored_overproduction      
+                                    _solution['metrics']['solar_energy_underproduction'] = _solar_energy_underproduction
+                                    _solution['metrics']['solar_energy_overproduction'] = _solar_energy_overproduction
+                                    _solution['metrics']['total_installation_costs'] += total_battery_costs 
+                                    _solution['metrics']['total_battery_capacity'] = total_battery_capacity
+                                    _solution['metrics']['solution_energy_costs'] = _solution_energy_costs
+                                    _solution['metrics']['genossenschaft_value'] = _genossenschaft_value
+                                    _solution['metrics']['genossenschaft_payback_perod'] = equip._get_genossenschaft_payback_perod(_genossenschaft_value, 
+                                                                                                                                solution['metrics']['total_installation_costs'])
+                                    _solution['metrics']['solution'] += [str({'battery' : bt['uuid'],
+                                                                        'battery_count' : bt['battery_count']}) for bt in batteries],
+                                    self.solutions.append(_solution)
 
         return self.solutions
     

@@ -15,6 +15,13 @@ def rescale(data):
         return data.fillna(0).resample('D').sum()
     return data
 
+def percentile(a, p=[0, 25, 50]):
+    a = np.asarray(a)
+    if a.sum() > 0:
+        a = a[(a != 0) & (np.isfinite(a))]
+        return [np.percentile(a, i) for i in p]
+    return [0]
+
 def rescale_monthly_profile(monthly_data, weekends=False):
     if weekends:
         data = pd.DataFrame()
