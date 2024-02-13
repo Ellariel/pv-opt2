@@ -356,10 +356,15 @@ class ConstraintSolver:
                                                 np.floor(kwattpeak_budget / kwattpeak_installed),
                                                 self.config['max_equipment_count'],
                             ])
+
                             area_used_sqm = eq['pv_size_Wmm'] * (eq['pv_size_Hmm'] + eq['pv_dist']) * pv_count / (10 ** 6)
 
                             if (pv_count <= 0) or (loc['area_used_sqm'] + area_used_sqm > loc['area_sqm']):
                                 break
+
+                            if pv_count < self.config['min_equipment_count']:
+                                print(f"{pv_count} < {self.config['min_equipment_count']}")
+                                continue
                             
                             eq['pv_count'] = pv_count
                             loc['area_used_sqm'] += area_used_sqm
