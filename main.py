@@ -38,6 +38,7 @@ config = {
             'discount_horison': 5,   
             'optimal_angle': 0,
             'optimal_both': 0,
+            'roof_installation_coef': 1.0,
             
             'max_investments': 250000,
             'max_kwattpeak': 100,
@@ -179,7 +180,7 @@ def calculate(base_dir):
                     print(f"attempt to select batteries for building {uuid}")
                     _config['autonomy_period_days'] = config['autonomy_period_days']
                     modified_solutions = {}
-                    results[uuid] = sorted(results[uuid], reverse=False, key=lambda x: x['solution_energy_costs'])
+                    results[uuid] = sorted(results[uuid], reverse=False, key=lambda x: x['genossenschaft_payback_perod']) #solution_energy_costs
                     for s in results[uuid][:config['shown_solutions_limit']]:#[:1]:
                         if uuid not in modified_solutions:
                             modified_solutions[uuid] = []

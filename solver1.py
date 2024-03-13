@@ -32,6 +32,7 @@ CACHED_CONGIF_KEYS = {
             'discount_horison': True, 
             'optimal_angle': True,
             'optimal_both': True,
+            'roof_installation_coef': True,
             
             'max_investments': False,
             'max_kwattpeak': False,
@@ -333,6 +334,7 @@ class ConstraintSolver:
         city_selling_price = self.config.get('city_selling_price', 0.20)
         grid_selling_price = self.config.get('grid_selling_price', 0.30) 
         grid_buying_price = self.config.get('grid_buying_price', 0.08)
+        roof_installation_coef = self.config.get('roof_installation_coef', 1.0)
         
         for i in tqdm(list(range(self.config['shown_solutions_limit']))): # split equipment
             for j in tqdm(list(range(self.config['shown_solutions_limit']))): # split locations
@@ -343,6 +345,7 @@ class ConstraintSolver:
                 _solutions = []
                 investments_budget = self.config['max_investments']
                 kwattpeak_budget = self.config['max_kwattpeak']
+                
                 for loc_idx, _list in copy.deepcopy(self.initial_solutions[j:]):
                     
                     if i >= len(_list):
@@ -363,14 +366,15 @@ class ConstraintSolver:
                                 break
 
                             if pv_count < self.config['min_equipment_count']:
-                                print(f"{pv_count} < {self.config['min_equipment_count']}")
+                                print(f"min_equipment_count exclusion: {pv_count} < {self.config['min_equipment_count']}")
                                 continue
                             
                             eq['pv_count'] = pv_count
                             loc['area_used_sqm'] += area_used_sqm
-                            investments_budget -= installation_costs * pv_count
+                            total_installation_costs = installation_costs * pv_count * roof_installation_coef ###
+                            investments_budget -= total_installation_costs
                             kwattpeak_budget -= kwattpeak_installed * pv_count
-                            _solutions.append((loc, eq, production * pv_count, installation_costs * pv_count))
+                            _solutions.append((loc, eq, production * pv_count, total_installation_costs))
                         
                     if (investments_budget <= 0) or (kwattpeak_budget <= 0):
                             break

@@ -152,6 +152,7 @@
                     value += '&discount_horison='+document.getElementById('discount_horison').value;
                     value += '&optimal_angle='+document.getElementById('optimal_angle').value;
                     value += '&optimal_both='+document.getElementById('optimal_both').value;
+                    value += '&roof_installation_coef='+document.getElementById('roof_installation_coef').value;
 
                     value += '&max_investments='+document.getElementById('max_investments').value;
                     value += '&max_kwattpeak='+document.getElementById('max_kwattpeak').value;
@@ -182,6 +183,7 @@
                             document.getElementById('discount_horison').value = req.discount_horison;
                             document.getElementById('optimal_angle').value = req.optimal_angle;
                             document.getElementById('optimal_both').value = req.optimal_both;
+                            document.getElementById('roof_installation_coef').value = req.roof_installation_coef;
                             
                             document.getElementById('max_investments').value = req.max_investments; 
                             document.getElementById('max_kwattpeak').value = req.max_kwattpeak;
@@ -354,8 +356,9 @@
                                             <td><div>optimal_angle:</td><td><input type="text" name="optimal_angle" id="optimal_angle"/><br /></div></td> 
                                         <tr>
                                             <td><div>optimal_both:</td><td><input type="text" name="optimal_both" id="optimal_both"/><br /></div></td>                                                    
+                                        <tr>
+                                            <td><div>roof_installation_coef:</td><td><input type="text" name="roof_installation_coef" id="roof_installation_coef"/><br /></div></td>                                                    
                                             
-            
                                         <tr>
                                             <td><div>max_investments:</td><td><input type="text" name="max_investments" id="max_investments"/><br /></div></td>
                                         <tr>

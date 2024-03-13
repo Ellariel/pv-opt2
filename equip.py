@@ -246,7 +246,7 @@ def _get_genossenschaft_payback_perod(genossenschaft_value, installation_costs, 
         npv += genossenschaft_value / (1 + discount_rate) ** i
         if npv + 1 > installation_costs:
             return i
-    return f'>{payback_period}'
+    return payback_period + 1
 
 def adjust_year(production, consumption):
     if isinstance(production, pd.Series) and isinstance(consumption, pd.Series):
